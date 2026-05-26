@@ -57,13 +57,26 @@ function stripInlineComment(line: string): string {
    IDENTIFIERS
    ========================================================= */
 
+// Workspace URI prefix used by `makeClassId` to produce stable, relative
+// IDs. Cached because the function is called once per class + once per base
+// reference (thousands of times on large workspaces) and resolving folders
+// each time would allocate a fresh string every call.
+let cachedWorkspacePrefix: string | null | undefined;
+
+export function resetWorkspacePrefix(): void {
+    cachedWorkspacePrefix = undefined;
+}
+
 export function makeClassId(
     fileUri: string,
     name: string,
     line: number
 ): string {
-    const wsUri = vscode.workspace.workspaceFolders?.[0]?.uri.toString();
-    const prefix = wsUri ? wsUri + '/' : null;
+    if (cachedWorkspacePrefix === undefined) {
+        const wsUri = vscode.workspace.workspaceFolders?.[0]?.uri.toString();
+        cachedWorkspacePrefix = wsUri ? wsUri + '/' : null;
+    }
+    const prefix = cachedWorkspacePrefix;
     const key =
         prefix && fileUri.startsWith(prefix)
             ? fileUri.slice(prefix.length)
@@ -75,13 +88,40 @@ export function makeClassId(
    DOCUMENT SYMBOLS
    ========================================================= */
 
+// Raw `DocumentSymbol[]` cache keyed by URI. Distinct from `symbolCache`
+// (which stores the post-processed `ClassNode` map): this one short-circuits
+// the LSP roundtrip itself. The big payoff is `resolveBaseId` — every class
+// in the workspace that inherits from a class in `models.py` ends up asking
+// for `models.py`'s symbols, and without dedup that's N redundant LSP calls
+// for the same data. Stores a Promise so concurrent callers share a single
+// in-flight request. Invalidated by `invalidateParserCache(uri)`.
+const rawSymbolsCache = new Map<
+    string,
+    Promise<vscode.DocumentSymbol[] | undefined>
+>();
+
 async function getDocumentSymbols(
     uri: vscode.Uri
 ): Promise<vscode.DocumentSymbol[] | undefined> {
-    return vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-        'vscode.executeDocumentSymbolProvider',
-        uri
-    );
+    const key = uri.toString();
+    const pending = rawSymbolsCache.get(key);
+    if (pending) {
+        return pending;
+    }
+    const fresh = (async () => {
+        try {
+            return await vscode.commands.executeCommand<
+                vscode.DocumentSymbol[] | undefined
+            >('vscode.executeDocumentSymbolProvider', uri);
+        } catch (err) {
+            // Don't cache failures — Pylance may simply not be ready yet, and
+            // we want subsequent calls to retry rather than serve a rejection.
+            rawSymbolsCache.delete(key);
+            throw err;
+        }
+    })();
+    rawSymbolsCache.set(key, fresh);
+    return fresh;
 }
 
 /* =========================================================
@@ -376,6 +416,17 @@ const symbolCache = new Map<
     { version: number; classes: Map<string, ClassNode> }
 >();
 
+export function invalidateParserCache(uri?: vscode.Uri): void {
+    if (uri) {
+        const key = uri.toString();
+        symbolCache.delete(key);
+        rawSymbolsCache.delete(key);
+    } else {
+        symbolCache.clear();
+        rawSymbolsCache.clear();
+    }
+}
+
 /* =========================================================
    ENTRY POINTS
    ========================================================= */
@@ -400,12 +451,19 @@ export async function extractClasses(
         return new Map();
     }
 
+    // Process classes in the same file in parallel: each
+    // `extractClassFromSymbol` mostly awaits `executeDefinitionProvider` calls
+    // for its base list, and those are independent across classes. The Map
+    // is built after all promises resolve so insertion order is deterministic.
+    const classSyms = symbols.filter(
+        s => s.kind === vscode.SymbolKind.Class
+    );
+    const nodes = await Promise.all(
+        classSyms.map(s => extractClassFromSymbol(s, document))
+    );
+
     const classes = new Map<string, ClassNode>();
-    for (const sym of symbols) {
-        if (sym.kind !== vscode.SymbolKind.Class) {
-            continue;
-        }
-        const node = await extractClassFromSymbol(sym, document);
+    for (const node of nodes) {
         classes.set(node.id, node);
     }
 
