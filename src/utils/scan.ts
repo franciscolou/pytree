@@ -3,16 +3,18 @@ import { ClassNode } from '../types';
 import { extractClasses } from './parser';
 
 let scanCache: Map<string, ClassNode> | null = null;
+let scanInProgress: Promise<Map<string, ClassNode>> | null = null;
+
+function invalidate(): void {
+    scanCache = null;
+    scanInProgress = null;
+}
 
 export function invalidateScanCache(): void {
-    scanCache = null;
+    invalidate();
 }
 
 export function initCache(context: vscode.ExtensionContext): void {
-    const invalidate = () => {
-        scanCache = null;
-    };
-
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.py');
     context.subscriptions.push(
         watcher,
@@ -27,13 +29,9 @@ export function initCache(context: vscode.ExtensionContext): void {
     );
 }
 
-export async function scanWorkspaceClasses(
+async function performScan(
     progress?: vscode.Progress<{ message?: string; increment?: number }>
 ): Promise<Map<string, ClassNode>> {
-    if (scanCache) {
-        return scanCache;
-    }
-
     const files = await vscode.workspace.findFiles(
         '**/*.py',
         '{**/node_modules/**,**/.venv/**,**/venv/**,**/__pycache__/**,**/.git/**,**/site-packages/**}'
@@ -58,6 +56,37 @@ export async function scanWorkspaceClasses(
         }
     }
 
-    scanCache = allClasses;
-    return scanCache;
+    return allClasses;
+}
+
+export async function scanWorkspaceClasses(
+    progress?: vscode.Progress<{ message?: string; increment?: number }>
+): Promise<Map<string, ClassNode>> {
+    if (scanCache) {
+        return scanCache;
+    }
+    // Concurrent callers (e.g. the background deferred scan from activate()
+    // + a user-triggered command racing it) share the same in-flight scan.
+    // The second caller's `progress` reporter is ignored — its withProgress
+    // notification just shows an indeterminate spinner, which is fine.
+    if (scanInProgress) {
+        return scanInProgress;
+    }
+
+    const myScan = performScan(progress);
+    scanInProgress = myScan;
+    try {
+        const result = await myScan;
+        // Only commit the result if no invalidation happened mid-scan. A
+        // FileSystemWatcher event during the scan zeroes scanInProgress; we
+        // then refuse to populate scanCache so the next caller starts fresh.
+        if (scanInProgress === myScan) {
+            scanCache = result;
+        }
+        return result;
+    } finally {
+        if (scanInProgress === myScan) {
+            scanInProgress = null;
+        }
+    }
 }

@@ -14,6 +14,7 @@ export const Messages = {
 
     status: {
         scanningFiles: 'PyTree: scanning files...',
+        backgroundScan: 'PyTree: indexing workspace classes...',
     },
 
     webView: {
