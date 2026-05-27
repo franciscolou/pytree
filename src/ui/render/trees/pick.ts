@@ -1,4 +1,5 @@
 import { ClassNode } from '../../../types';
+import { UI } from '../../../config';
 import { Group, HtmlRoot, Svg } from '../../components';
 import { buildTreeLayout } from './single';
 import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
@@ -12,8 +13,28 @@ export function renderMultiTree(
         descendantLayers: ClassNode[][];
     }>
 ): string {
+    // Lazy decision uses the union of all class IDs across trees — a single
+    // class shared between trees counts once. This matches the user-visible
+    // DOM cost (each box is rendered once per tree it appears in, but the
+    // threshold tracks logical complexity of the picked set).
+    const allIds = new Set<string>();
+    for (const t of trees) {
+        allIds.add(t.focus.id);
+        for (const layer of t.ancestorLayers) {
+            for (const node of layer) {
+                allIds.add(node.id);
+            }
+        }
+        for (const layer of t.descendantLayers) {
+            for (const node of layer) {
+                allIds.add(node.id);
+            }
+        }
+    }
+    const lazy = allIds.size > UI.lazy.renderThreshold;
+
     const layouts = trees.map(t =>
-        buildTreeLayout(t.focus, t.ancestorLayers, t.descendantLayers)
+        buildTreeLayout(t.focus, t.ancestorLayers, t.descendantLayers, lazy)
     );
 
     const centersX: number[] = [];
@@ -33,6 +54,12 @@ export function renderMultiTree(
         )
         .join('');
 
+    // Aggregate body fragments across all picked trees. Each tree wraps its
+    // boxes in a `translate(centerX, 0)` group, but lazy bodies are inserted
+    // into the slot inside each box's own `<g data-pt-box>` — that slot is
+    // already positioned, so injection is location-independent.
+    const lazyBodies = lazy ? layouts.flatMap(l => l.lazyBodies) : undefined;
+
     return HtmlRoot(
         Svg({
             width: '100%',
@@ -44,6 +71,6 @@ export function renderMultiTree(
                     transform: 'translate(0,0) scale(1)',
                     children: allSvg,
                 }),
-        }) + renderViewportScript({ initialScale: 0.5 })
+        }) + renderViewportScript({ initialScale: 0.5, lazyBodies })
     );
 }

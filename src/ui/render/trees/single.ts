@@ -30,7 +30,9 @@ function positionLayer(
     layer: ClassNode[],
     topY: number,
     allNodes: Map<string, ClassNode>,
-    horizontalGap: number
+    horizontalGap: number,
+    lazy: boolean,
+    lazyBodies: Array<[string, string]>
 ): { svgs: string[]; positions: BoxMeasures[] } {
     const inherited = layer.map(node => collectInheritedNames(node, allNodes));
     const sizes = layer.map((node, i) => measureClassBox(node, inherited[i]));
@@ -45,8 +47,11 @@ function positionLayer(
 
     layer.forEach((node, i) => {
         const x = xCursor + sizes[i].width / 2;
-        const rendered = renderClassBox(node, x, topY, inherited[i]);
+        const rendered = renderClassBox(node, x, topY, inherited[i], { lazy });
         svgs.push(rendered.svg);
+        if (rendered.lazyBody) {
+            lazyBodies.push([rendered.lazyBody.boxId, rendered.lazyBody.html]);
+        }
         positions.push({
             x,
             y: topY,
@@ -64,12 +69,14 @@ export interface TreeLayout {
     halfWidth: number;
     topY: number;
     bottomY: number;
+    lazyBodies: Array<[string, string]>;
 }
 
 export function buildTreeLayout(
     focus: ClassNode,
     ancestorLayers: ClassNode[][],
-    descendantLayers: ClassNode[][]
+    descendantLayers: ClassNode[][],
+    lazy = false
 ): TreeLayout {
     const { verticalGap, horizontalGap } = UI.tree;
 
@@ -96,12 +103,21 @@ export function buildTreeLayout(
         return total / 2;
     };
 
+    const lazyBodies: Array<[string, string]> = [];
+
     const focusRendered = renderClassBox(
         focus,
         0,
         0,
-        collectInheritedNames(focus, allNodes)
+        collectInheritedNames(focus, allNodes),
+        { lazy }
     );
+    if (focusRendered.lazyBody) {
+        lazyBodies.push([
+            focusRendered.lazyBody.boxId,
+            focusRendered.lazyBody.html,
+        ]);
+    }
     let halfWidth = layerHalfWidth([focus]);
     let boxesSvg = focusRendered.svg;
 
@@ -124,7 +140,9 @@ export function buildTreeLayout(
             ordered,
             currentY,
             allNodes,
-            horizontalGap
+            horizontalGap,
+            lazy,
+            lazyBodies
         );
         boxesSvg += svgs.join('');
         ancestorLayerBoxes.push(positions);
@@ -148,7 +166,9 @@ export function buildTreeLayout(
             ordered,
             currentY,
             allNodes,
-            horizontalGap
+            horizontalGap,
+            lazy,
+            lazyBodies
         );
         boxesSvg += svgs.join('');
         currentY += Math.max(...positions.map(box => box.height)) + verticalGap;
@@ -182,7 +202,32 @@ export function buildTreeLayout(
             focusBox
         );
 
-    return { svg: edgesSvg + boxesSvg, halfWidth, topY, bottomY };
+    return {
+        svg: edgesSvg + boxesSvg,
+        halfWidth,
+        topY,
+        bottomY,
+        lazyBodies,
+    };
+}
+
+function totalNodeCount(
+    focus: ClassNode,
+    ancestorLayers: ClassNode[][],
+    descendantLayers: ClassNode[][]
+): number {
+    const seen = new Set<string>([focus.id]);
+    for (const layer of ancestorLayers) {
+        for (const node of layer) {
+            seen.add(node.id);
+        }
+    }
+    for (const layer of descendantLayers) {
+        for (const node of layer) {
+            seen.add(node.id);
+        }
+    }
+    return seen.size;
 }
 
 export function renderClassTree(
@@ -190,7 +235,14 @@ export function renderClassTree(
     ancestorLayers: ClassNode[][],
     descendantLayers: ClassNode[][]
 ): string {
-    const { svg } = buildTreeLayout(focus, ancestorLayers, descendantLayers);
+    const total = totalNodeCount(focus, ancestorLayers, descendantLayers);
+    const lazy = total > UI.lazy.renderThreshold;
+    const { svg, lazyBodies } = buildTreeLayout(
+        focus,
+        ancestorLayers,
+        descendantLayers,
+        lazy
+    );
 
     return HtmlRoot(
         Svg({
@@ -203,6 +255,10 @@ export function renderClassTree(
                     transform: 'translate(0,0) scale(1)',
                     children: svg,
                 }),
-        }) + renderViewportScript({ focusNodeId: focus.id })
+        }) +
+            renderViewportScript({
+                focusNodeId: focus.id,
+                lazyBodies: lazy ? lazyBodies : undefined,
+            })
     );
 }

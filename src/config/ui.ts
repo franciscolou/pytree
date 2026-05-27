@@ -33,4 +33,13 @@ export const UI = {
     pan: {
         sensitivity: 0.9,
     },
+
+    lazy: {
+        // Above this many class boxes in a single webview, body content
+        // (file path, attributes, properties, methods) is hydrated on demand
+        // as boxes enter the viewport instead of being baked into the initial
+        // SVG. Outline + class-name header are always present so the layout
+        // and box positions remain visible while panning. Tuning placeholder.
+        renderThreshold: 150,
+    },
 } as const;

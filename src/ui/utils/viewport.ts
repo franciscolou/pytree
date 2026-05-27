@@ -37,6 +37,11 @@ export function renderViewportScript(
         initialScale?: number;
         focusNodeId?: string;
         filterInfo?: FilterInfo;
+        // When provided, the script wires up viewport-driven body hydration:
+        // each box's heavy content is parked in this map and only injected
+        // into its `<g data-pt-lazy-body>` slot when the box (or a generous
+        // margin around it) intersects the visible viewport.
+        lazyBodies?: Array<[string, string]>;
     } = {}
 ): string {
     const initialScale = opts.initialScale ?? 1;
@@ -44,7 +49,17 @@ export function renderViewportScript(
         ? `const _focusEl = viewport.querySelector('[data-pt-box-id="' + (window.CSS && CSS.escape ? CSS.escape(${JSON.stringify(opts.focusNodeId)}) : ${JSON.stringify(opts.focusNodeId)}) + '"]');
       const _initBbox = _focusEl ? _focusEl.getBBox() : viewport.getBBox();`
         : `const _initBbox = viewport.getBBox();`;
+
+    // Escape `</` so a body containing literal "</script>" (e.g. a default
+    // value with a fragment) can't terminate the script tag early.
+    const lazyDataTag = opts.lazyBodies
+        ? `<script type="application/json" id="pt-lazy-bodies">${JSON.stringify(
+              opts.lazyBodies
+          ).replace(/<\//g, '<\\/')}</script>`
+        : '';
+
     return `
+${lazyDataTag}
 <style>
   #find-bar button {
     background: transparent;
@@ -117,6 +132,111 @@ ${FindBar()}
   const showPathsCb = document.getElementById('show-paths-cb');
   showPathsCb.checked = showPaths;
   if (showPaths) svg.classList.add('show-paths');
+
+  // === LAZY BODY HYDRATION ===
+  // For trees above UI.lazy.renderThreshold, each box ships with an empty
+  // <g data-pt-lazy-body="..."> slot. The body SVG sits parked in a JSON
+  // payload until the box's bounding box (plus a margin) intersects the
+  // viewport, at which point we inject it. Boxes that drift far enough away
+  // get torn back down so the DOM stays bounded regardless of tree size.
+  const lazyDataEl = document.getElementById('pt-lazy-bodies');
+  const lazyBodies = lazyDataEl
+    ? new Map(JSON.parse(lazyDataEl.textContent))
+    : null;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  // Hydrate slightly outside the viewport so panning reveals already-loaded
+  // content. Dehydrate at a much larger radius so fast pan reversals don't
+  // immediately repay the parse cost.
+  const HYDRATE_MARGIN_PX = 400;
+  const DEHYDRATE_MARGIN_PX = 1600;
+
+  let lazyBoxes = null;
+  function collectLazyBoxes() {
+    if (!lazyBodies) return;
+    lazyBoxes = [];
+    viewport.querySelectorAll('[data-pt-box]').forEach(el => {
+      const slot = el.querySelector('[data-pt-lazy-body]');
+      if (!slot) return;
+      lazyBoxes.push({
+        slot,
+        x: parseFloat(el.dataset.ptX),
+        y: parseFloat(el.dataset.ptY),
+        w: parseFloat(el.dataset.ptW),
+        h: parseFloat(el.dataset.ptH),
+        hydrated: false,
+      });
+    });
+  }
+  collectLazyBoxes();
+
+  function hydrateBox(box) {
+    if (box.hydrated) return;
+    const id = box.slot.dataset.ptLazyBody;
+    const html = lazyBodies.get(id);
+    if (!html) return;
+    // Wrap in a foreign <svg> so the HTML parser puts children in the SVG
+    // namespace; then move them into the live slot. Faster than DOMParser
+    // and avoids the XML strictness pitfalls.
+    const wrapper = document.createElementNS(SVG_NS, 'svg');
+    wrapper.innerHTML = html;
+    while (wrapper.firstChild) {
+      box.slot.appendChild(wrapper.firstChild);
+    }
+    box.hydrated = true;
+  }
+
+  function dehydrateBox(box) {
+    if (!box.hydrated) return;
+    while (box.slot.firstChild) {
+      box.slot.removeChild(box.slot.firstChild);
+    }
+    box.hydrated = false;
+  }
+
+  let forceHydrateAll = false;
+  function updateLazyBodies() {
+    if (!lazyBoxes) return;
+    if (forceHydrateAll) {
+      for (const box of lazyBoxes) hydrateBox(box);
+      return;
+    }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    for (const box of lazyBoxes) {
+      const screenLeft = box.x * scale + tx;
+      const screenTop = box.y * scale + ty;
+      const screenRight = screenLeft + box.w * scale;
+      const screenBottom = screenTop + box.h * scale;
+      const inHydrateRect =
+        screenRight >= -HYDRATE_MARGIN_PX &&
+        screenLeft <= vw + HYDRATE_MARGIN_PX &&
+        screenBottom >= -HYDRATE_MARGIN_PX &&
+        screenTop <= vh + HYDRATE_MARGIN_PX;
+      if (inHydrateRect) {
+        hydrateBox(box);
+        continue;
+      }
+      if (!box.hydrated) continue;
+      const inDehydrateRect =
+        screenRight >= -DEHYDRATE_MARGIN_PX &&
+        screenLeft <= vw + DEHYDRATE_MARGIN_PX &&
+        screenBottom >= -DEHYDRATE_MARGIN_PX &&
+        screenTop <= vh + DEHYDRATE_MARGIN_PX;
+      if (!inDehydrateRect) {
+        dehydrateBox(box);
+      }
+    }
+  }
+
+  let _hydrateRAF = null;
+  function scheduleHydrate() {
+    if (!lazyBoxes) return;
+    if (_hydrateRAF !== null) return;
+    _hydrateRAF = requestAnimationFrame(() => {
+      _hydrateRAF = null;
+      updateLazyBodies();
+    });
+  }
 
   // === EXPORT DROPDOWN ===
   const exportBtnEl  = document.getElementById('export-btn');
@@ -268,6 +388,7 @@ ${FindBar()}
     _committedTy = ty;
     _committedScale = scale;
     vscode.setState({ tx, ty, scale, showPaths });
+    scheduleHydrate();
   }
 
   // When wrapped, the SVG's rect is post-CSS-transform, so we hardcode the
@@ -282,6 +403,7 @@ ${FindBar()}
     } else {
       _svgRect = svg.getBoundingClientRect();
     }
+    scheduleHydrate();
   });
 
   svg.style.cursor = "grab";
@@ -647,6 +769,13 @@ ${FindBar()}
   }
 
   function openFindBar() {
+    // Find searches the live DOM, so when lazy mode is on we have to bring
+    // every body in before the user can match anything off-viewport. The
+    // cost is paid once on open; subsequent searches reuse the hydrated DOM.
+    if (lazyBoxes && !forceHydrateAll) {
+      forceHydrateAll = true;
+      updateLazyBodies();
+    }
     findBar.style.display = 'flex';
     findInput.focus();
     findInput.select();
@@ -659,6 +788,12 @@ ${FindBar()}
     findCurrent = -1;
     findCountEl.textContent = '';
     findInput.value = '';
+    // Drop the "hydrate everything" flag and let the next scheduled pass
+    // tear down boxes that have drifted far from the current viewport.
+    if (forceHydrateAll) {
+      forceHydrateAll = false;
+      scheduleHydrate();
+    }
   }
 
   function toggleFindCase() {

@@ -728,7 +728,12 @@ export function renderClassBox(
     node: ClassNode,
     x: number,
     y: number,
-    inherited: { attrs: Set<string>; props: Set<string>; methods: Set<string> }
+    inherited: {
+        attrs: Set<string>;
+        props: Set<string>;
+        methods: Set<string>;
+    },
+    opts: { lazy?: boolean } = {}
 ): RenderedBox {
     const {
         headerHeight,
@@ -933,18 +938,42 @@ export function renderClassBox(
         children: parts.join(''),
     });
 
+    const boxX = x - width / 2;
+
+    // Split point: shell (always emitted) vs. body (lazy-hydratable).
+    // Shell carries enough to show the box outline + class name in place so
+    // the layout is intelligible while panning across thousands of nodes.
+    // `filePathSection` lives in the shell on purpose — it's hover-only (so
+    // the DOM cost is trivial) and keeping it before `header` preserves the
+    // intended z-order (header masks the section's bottom-rounded corners).
+    const shell = panel + filePathSection + header + title;
+    const body = clipDef + clippedContent;
+
+    if (opts.lazy) {
+        const slot = `<g data-pt-lazy-body="${escapeXml(node.id).replace(/"/g, '&quot;')}"></g>`;
+        return {
+            svg: Group({
+                dataPtBox: true,
+                dataPtBoxId: node.id,
+                dataPtX: boxX,
+                dataPtY: y,
+                dataPtW: width,
+                dataPtH: height,
+                transform: `translate(${boxX}, ${y})`,
+                children: shell + slot,
+            }),
+            width,
+            height,
+            lazyBody: { boxId: node.id, html: body },
+        };
+    }
+
     return {
         svg: Group({
             dataPtBox: true,
             dataPtBoxId: node.id,
-            transform: `translate(${x - width / 2}, ${y})`,
-            children:
-                clipDef +
-                panel +
-                filePathSection +
-                header +
-                title +
-                clippedContent,
+            transform: `translate(${boxX}, ${y})`,
+            children: shell + body,
         }),
         width,
         height,

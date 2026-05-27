@@ -60,7 +60,9 @@ function positionLayerAt(
     topY: number,
     centerX: number,
     allNodes: Map<string, ClassNode>,
-    horizontalGap: number
+    horizontalGap: number,
+    lazy: boolean,
+    lazyBodies: Array<[string, string]>
 ): { svgs: string[]; positions: BoxMeasures[] } {
     const inherited = layer.map(node => collectInheritedNames(node, allNodes));
     const sizes = layer.map((node, i) => measureClassBox(node, inherited[i]));
@@ -74,8 +76,11 @@ function positionLayerAt(
 
     layer.forEach((node, i) => {
         const x = xCursor + sizes[i].width / 2;
-        const rendered = renderClassBox(node, x, topY, inherited[i]);
+        const rendered = renderClassBox(node, x, topY, inherited[i], { lazy });
         svgs.push(rendered.svg);
+        if (rendered.lazyBody) {
+            lazyBodies.push([rendered.lazyBody.boxId, rendered.lazyBody.html]);
+        }
         positions.push({
             x,
             y: topY,
@@ -170,6 +175,9 @@ export function renderProjectTree(
         []
     );
 
+    const lazy = allNodes.size > UI.lazy.renderThreshold;
+    const lazyBodies: Array<[string, string]> = [];
+
     let boxesSvg = '';
     let edgesSvg = '';
 
@@ -194,7 +202,9 @@ export function renderProjectTree(
                 currentY,
                 centerX,
                 allNodes,
-                horizontalGap
+                horizontalGap,
+                lazy,
+                lazyBodies
             );
             boxesSvg += svgs.join('');
             layerBoxes.push(positions);
@@ -218,6 +228,11 @@ export function renderProjectTree(
                     transform: 'translate(0,0) scale(1)',
                     children: edgesSvg + boxesSvg,
                 }),
-        }) + renderViewportScript({ initialScale: 0.5, filterInfo })
+        }) +
+            renderViewportScript({
+                initialScale: 0.5,
+                filterInfo,
+                lazyBodies: lazy ? lazyBodies : undefined,
+            })
     );
 }

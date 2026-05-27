@@ -5,6 +5,13 @@ export interface GroupProps {
     clipPath?: string;
     dataPtBox?: boolean;
     dataPtBoxId?: string;
+    // Pre-transform box coordinates in viewport-space. Emitted only when set
+    // (lazy mode) so the hydration script can compute screen visibility from
+    // (tx, ty, scale) without touching layout via getBoundingClientRect.
+    dataPtX?: number;
+    dataPtY?: number;
+    dataPtW?: number;
+    dataPtH?: number;
     children: string;
 }
 
@@ -22,6 +29,10 @@ export function Group({
     clipPath,
     dataPtBox,
     dataPtBoxId,
+    dataPtX,
+    dataPtY,
+    dataPtW,
+    dataPtH,
     children,
 }: GroupProps): string {
     const attrs = [
@@ -31,6 +42,10 @@ export function Group({
         clipPath ? `clip-path="${clipPath}"` : '',
         dataPtBox ? 'data-pt-box' : '',
         dataPtBoxId ? `data-pt-box-id="${escapeAttr(dataPtBoxId)}"` : '',
+        dataPtX !== undefined ? `data-pt-x="${dataPtX}"` : '',
+        dataPtY !== undefined ? `data-pt-y="${dataPtY}"` : '',
+        dataPtW !== undefined ? `data-pt-w="${dataPtW}"` : '',
+        dataPtH !== undefined ? `data-pt-h="${dataPtH}"` : '',
     ]
         .filter(Boolean)
         .join(' ');
