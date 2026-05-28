@@ -7,6 +7,7 @@ import {
     showPickClassesTree,
     showPickPathsTree,
     showAllExceptTree,
+    showCreateBoard,
 } from './handlers';
 import { Messages } from './config';
 import { HoverProvider } from './providers/hover';
@@ -32,6 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
         registerPickClassesCommand(context),
         registerPickPathsCommand(context),
         registerAllExceptCommand(context),
+        registerCreateCommand(context),
         scheduleBackgroundScan()
     );
 }
@@ -178,5 +180,13 @@ function registerAllExceptCommand(
 ): vscode.Disposable {
     return vscode.commands.registerCommand('pytree.allExcept', () =>
         showAllExceptTree(context)
+    );
+}
+
+function registerCreateCommand(
+    context: vscode.ExtensionContext
+): vscode.Disposable {
+    return vscode.commands.registerCommand('pytree.create', () =>
+        showCreateBoard(context)
     );
 }

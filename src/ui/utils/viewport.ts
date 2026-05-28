@@ -552,7 +552,30 @@ ${FindBar()}
     return true;
   }
 
+  // Tracks which mouse button started the current pan so endPan knows whether
+  // to dispatch the click-to-navigate behavior (left button only).
+  let panButton = -1;
+
+  // Middle-mouse-button always pans, regardless of what's under the cursor —
+  // no edge drag, no navigation on release. Browsers also tend to show an
+  // auto-scroll cursor on middle-click, which we suppress on mousedown.
+  svg.addEventListener("mousedown", e => {
+    if (e.button === 1) e.preventDefault();
+  });
+
   svg.addEventListener("pointerdown", e => {
+    if (e.button === 1) {
+      e.preventDefault();
+      isPanning = true;
+      panButton = 1;
+      pointerDownTarget = null;
+      pointerMoved = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      svg.setPointerCapture(e.pointerId);
+      svg.style.cursor = "grabbing";
+      return;
+    }
     if (e.button !== 0) return;
     const edgeEl = e.target.closest && e.target.closest('[data-pt-edge]');
     if (edgeEl) {
@@ -561,6 +584,7 @@ ${FindBar()}
       return;
     }
     isPanning = true;
+    panButton = 0;
     pointerDownTarget = e.target;
     pointerMoved = false;
     lastX = e.clientX;
@@ -587,7 +611,9 @@ ${FindBar()}
 
   function endPan(e) {
     if (endEdgeDrag(e)) return;
-    if (!pointerMoved && pointerDownTarget) {
+    // Only the left button triggers click-to-navigate. A middle-click without
+    // motion is a stationary pan attempt, not a navigation request.
+    if (panButton === 0 && !pointerMoved && pointerDownTarget) {
       const navTarget = pointerDownTarget.closest("[data-line]");
       if (navTarget) {
         vscode.postMessage({
@@ -598,6 +624,7 @@ ${FindBar()}
       }
     }
     isPanning = false;
+    panButton = -1;
     pointerMoved = false;
     pointerDownTarget = null;
     svg.style.cursor = "grab";

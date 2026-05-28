@@ -42,11 +42,28 @@ async function main() {
             esbuildProblemMatcherPlugin,
         ],
     });
+    // Pure geometry module bundled separately as a browser IIFE so the
+    // PyTree: Create webview can use the SAME algorithm as the auto-tree
+    // SVG renderer — no hand-copied duplicate of the lane-assignment /
+    // highway-routing code. Exposed at `window.PTEdgeLayout`.
+    const clientCtx = await esbuild.context({
+        entryPoints: ['src/ui/utils/edgeLayout.ts'],
+        bundle: true,
+        format: 'iife',
+        globalName: 'PTEdgeLayout',
+        platform: 'browser',
+        outfile: 'dist/edgeLayout.client.js',
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        logLevel: 'silent',
+        plugins: [esbuildProblemMatcherPlugin],
+    });
     if (watch) {
-        await ctx.watch();
+        await Promise.all([ctx.watch(), clientCtx.watch()]);
     } else {
-        await ctx.rebuild();
-        await ctx.dispose();
+        await Promise.all([ctx.rebuild(), clientCtx.rebuild()]);
+        await Promise.all([ctx.dispose(), clientCtx.dispose()]);
     }
 }
 

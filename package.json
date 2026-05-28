@@ -45,6 +45,10 @@
             {
                 "command": "pytree.allExcept",
                 "title": "PyTree: All Except..."
+            },
+            {
+                "command": "pytree.create",
+                "title": "PyTree: Create"
             }
         ],
         "keybindings": [
