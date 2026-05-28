@@ -77,11 +77,13 @@ ${lazyDataTag}
   #paths-toggle label { cursor: pointer; user-select: none; }
   #paths-toggle input { cursor: pointer; }
   .find-toggle.active { background: rgba(0,122,204,0.25) !important; border-color: #007acc !important; }
-  [data-pt-edge]:hover polygon[fill="none"] {
+  [data-pt-edge-role="tip"]:hover polygon[fill="none"] {
     transform-box: fill-box;
     transform-origin: top center;
     transform: scale(1.5);
   }
+  .pt-edge-body-vis { transition: stroke-width 0.1s ease; }
+  [data-pt-edge-role="body"]:hover .pt-edge-body-vis { stroke-width: 2.5; }
   #edge-tooltip, #nav-tooltip {
     position: fixed;
     display: none;
@@ -409,13 +411,38 @@ ${FindBar()}
   svg.style.cursor = "grab";
   svg.style.userSelect = "none";
 
-  // === EDGE DRAG ===
-  // When the user starts a pointerdown on an inheritance arrow, we capture
-  // the drag and prevent the canvas pan from kicking in. While dragging,
-  // a "ghost" line follows the cursor from the original child class box.
-  // On pointerup, if released over a class box, we ask the extension to
-  // change the inheritance in the source code.
-  let edgeDrag = null;
+  // === EDGE INTERACTIONS ===
+  // The inheritance arrow has two interactive regions:
+  //   - tip (the triangular arrowhead) → drag-and-drop changes inheritance;
+  //     a click without drag pans the view to focus the subclass.
+  //   - body (the polyline) → click pans the view to focus the superclass.
+  // The pointerdown handler dispatches to the right state depending on which
+  // sub-group the click landed in; the pointerup handler interprets the
+  // gesture (click vs drag) and acts accordingly.
+  let edgeDrag = null;       // tip pointer interaction (drag + click-to-focus-child)
+  let edgeBodyClick = null;  // body pointer interaction (click-to-focus-parent)
+
+  function panToBox(boxId) {
+    if (!boxId) return;
+    const sel = '[data-pt-box-id="' +
+      (window.CSS && CSS.escape ? CSS.escape(boxId) : boxId) + '"]';
+    const boxEl = viewport.querySelector(sel);
+    if (!boxEl) return;
+    // We deliberately use getBoundingClientRect over getBBox here:
+    // getBBox returns coordinates in the element's LOCAL user-space, which
+    // excludes the box group's own translate() — so every box would report
+    // the same (0, 0, w, h). getBoundingClientRect gives the post-transform
+    // screen rect, which we can convert to the pan delta needed to centre
+    // the box. Works for both fully-hydrated and shell-only (lazy) boxes
+    // since the shell already paints the outline.
+    const r = boxEl.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return;
+    const screenCx = r.left + r.width / 2;
+    const screenCy = r.top + r.height / 2;
+    tx += window.innerWidth / 2 - screenCx;
+    ty += window.innerHeight / 2 - screenCy;
+    update();
+  }
 
   // === TOOLTIPS (edge + navigation) ===
   const edgeTooltip = document.getElementById('edge-tooltip');
@@ -491,7 +518,9 @@ ${FindBar()}
     );
     const origin = childBox ? getBoxCenter(childBox) : clientToSvg(e.clientX, e.clientY);
 
-    // Build the ghost line element once.
+    // Ghost line lives in the DOM as soon as the gesture starts, but is hidden
+    // until the user actually drags past the click threshold — that way a
+    // simple click on the tip doesn't paint a stub ghost.
     const ghost = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     ghost.setAttribute('stroke', edgeColor);
     ghost.setAttribute('stroke-opacity', '0.55');
@@ -502,9 +531,14 @@ ${FindBar()}
     ghost.setAttribute('y1', origin.y);
     ghost.setAttribute('x2', origin.x);
     ghost.setAttribute('y2', origin.y);
+    ghost.style.display = 'none';
     viewport.appendChild(ghost);
 
-    edgeDrag = { edgeEl, childId, parentId, origin, ghost, hoverBoxEl: null };
+    edgeDrag = {
+      edgeEl, childId, parentId, origin, ghost,
+      hoverBoxEl: null,
+      startX: e.clientX, startY: e.clientY, moved: false,
+    };
     hideAllTooltips();
     svg.setPointerCapture(e.pointerId);
     svg.style.cursor = 'grabbing';
@@ -512,6 +546,13 @@ ${FindBar()}
 
   function updateEdgeDrag(e) {
     if (!edgeDrag) return;
+    if (!edgeDrag.moved) {
+      const dx = e.clientX - edgeDrag.startX;
+      const dy = e.clientY - edgeDrag.startY;
+      if (Math.abs(dx) < CLICK_THRESHOLD && Math.abs(dy) < CLICK_THRESHOLD) return;
+      edgeDrag.moved = true;
+      edgeDrag.ghost.style.display = '';
+    }
     const p = clientToSvg(e.clientX, e.clientY);
     edgeDrag.ghost.setAttribute('x2', p.x);
     edgeDrag.ghost.setAttribute('y2', p.y);
@@ -528,19 +569,24 @@ ${FindBar()}
 
   function endEdgeDrag(e) {
     if (!edgeDrag) return false;
-    const { childId, parentId, ghost, hoverBoxEl } = edgeDrag;
+    const { childId, parentId, ghost, hoverBoxEl, moved } = edgeDrag;
     if (hoverBoxEl) hoverBoxEl.style.filter = '';
     ghost.remove();
-
-    // Determine the drop target box.
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    const boxEl = under ? under.closest('[data-pt-box-id]') : null;
-    const newParentId = boxEl ? boxEl.dataset.ptBoxId : null;
 
     edgeDrag = null;
     svg.style.cursor = 'grab';
     try { svg.releasePointerCapture(e.pointerId); } catch {}
 
+    if (!moved) {
+      // Click on the arrow tip without drag → focus the subclass.
+      panToBox(childId);
+      return true;
+    }
+
+    // Drag: see whether the user released over a candidate new parent box.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const boxEl = under ? under.closest('[data-pt-box-id]') : null;
+    const newParentId = boxEl ? boxEl.dataset.ptBoxId : null;
     if (newParentId && newParentId !== parentId) {
       vscode.postMessage({
         command: 'changeInheritance',
@@ -548,6 +594,41 @@ ${FindBar()}
         oldParentId: parentId,
         newParentId: newParentId,
       });
+    }
+    return true;
+  }
+
+  // Body-click: cheaper than the tip drag (no ghost, no hover highlight).
+  // Just record where the click started so we can tell a click from an
+  // accidental pan-while-clicking on release.
+  function startEdgeBodyClick(edgeEl, e) {
+    const parentId = edgeEl.dataset.ptEdgeParent;
+    if (!parentId) return;
+    edgeBodyClick = {
+      parentId,
+      startX: e.clientX, startY: e.clientY, moved: false,
+    };
+    hideAllTooltips();
+    svg.setPointerCapture(e.pointerId);
+  }
+
+  function updateEdgeBodyClick(e) {
+    if (!edgeBodyClick || edgeBodyClick.moved) return;
+    const dx = e.clientX - edgeBodyClick.startX;
+    const dy = e.clientY - edgeBodyClick.startY;
+    if (Math.abs(dx) > CLICK_THRESHOLD || Math.abs(dy) > CLICK_THRESHOLD) {
+      edgeBodyClick.moved = true;
+    }
+  }
+
+  function endEdgeBodyClick(e) {
+    if (!edgeBodyClick) return false;
+    const { parentId, moved } = edgeBodyClick;
+    edgeBodyClick = null;
+    try { svg.releasePointerCapture(e.pointerId); } catch {}
+    if (!moved) {
+      // Click on the arrow body → focus the superclass.
+      panToBox(parentId);
     }
     return true;
   }
@@ -580,7 +661,14 @@ ${FindBar()}
     const edgeEl = e.target.closest && e.target.closest('[data-pt-edge]');
     if (edgeEl) {
       e.stopPropagation();
-      startEdgeDrag(edgeEl, e);
+      const roleEl = e.target.closest && e.target.closest('[data-pt-edge-role]');
+      const role = roleEl ? roleEl.dataset.ptEdgeRole : null;
+      if (role === 'body') {
+        startEdgeBodyClick(edgeEl, e);
+      } else {
+        // tip (or, for backward compat, an edge group without a sub-role)
+        startEdgeDrag(edgeEl, e);
+      }
       return;
     }
     isPanning = true;
@@ -598,6 +686,10 @@ ${FindBar()}
       updateEdgeDrag(e);
       return;
     }
+    if (edgeBodyClick) {
+      updateEdgeBodyClick(e);
+      return;
+    }
     if (!isPanning) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -611,6 +703,7 @@ ${FindBar()}
 
   function endPan(e) {
     if (endEdgeDrag(e)) return;
+    if (endEdgeBodyClick(e)) return;
     // Only the left button triggers click-to-navigate. A middle-click without
     // motion is a stationary pan attempt, not a navigation request.
     if (panButton === 0 && !pointerMoved && pointerDownTarget) {

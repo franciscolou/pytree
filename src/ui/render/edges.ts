@@ -9,6 +9,8 @@ import {
 
 const ARROW_W = 12;
 const ARROW_H = 10;
+const BODY_HIT_W = 14;
+const BODY_VIS_W = 1;
 
 export function hollowArrow(x: number, y: number, color: string): string {
     return `<polygon points="${x},${y} ${x - ARROW_W / 2},${y + ARROW_H} ${x + ARROW_W / 2},${y + ARROW_H}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
@@ -21,26 +23,37 @@ function escapeAttr(s: string): string {
         .replace(/</g, '&lt;');
 }
 
-// Interactive arrow: enlarged transparent hit area + visible polygon, wrapped
-// in a group carrying the child/parent class IDs so the webview can detect
-// drag-and-drop of the inheritance arrow.
-function interactiveHollowArrow(
-    x: number,
-    y: number,
-    color: string,
-    childId: string,
-    parentId: string,
-    childName?: string,
-    parentName?: string
-): string {
-    const pad = 6;
-    const hitArea = `<polygon points="${x},${y - pad} ${x - ARROW_W / 2 - pad},${y + ARROW_H + pad} ${x + ARROW_W / 2 + pad},${y + ARROW_H + pad}" fill="transparent" stroke="none"/>`;
-    const arrow = hollowArrow(x, y, color);
+// Interactive edge: wraps the whole inheritance arrow (the triangular tip plus
+// the polyline body) in a single group carrying the child/parent identifiers
+// so the webview can drive:
+//   - tooltip on hover (anywhere on the edge)
+//   - drag-and-drop on the tip → change inheritance
+//   - click on the tip without drag → focus the subclass
+//   - click anywhere on the body → focus the superclass
+// Each visible primitive is shadowed by a wider, transparent twin that owns the
+// hit area, so a thin 1px line still has a comfortable click target.
+function interactiveEdge(e: ComputedEdge, color: string): string {
+    const { arrow, segments, childId, parentId, childName, parentName } = e;
+
+    const tipPad = 6;
+    const tipHit = `<polygon points="${arrow.x},${arrow.y - tipPad} ${arrow.x - ARROW_W / 2 - tipPad},${arrow.y + ARROW_H + tipPad} ${arrow.x + ARROW_W / 2 + tipPad},${arrow.y + ARROW_H + tipPad}" fill="transparent" stroke="none"/>`;
+    const tipVis = hollowArrow(arrow.x, arrow.y, color);
+    const tipGroup = `<g data-pt-edge-role="tip" style="cursor: pointer">${tipHit}${tipVis}</g>`;
+
+    const bodySegments = segments
+        .map(
+            s =>
+                `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="transparent" stroke-width="${BODY_HIT_W}" pointer-events="stroke"/>` +
+                `<line class="pt-edge-body-vis" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${color}" stroke-width="${BODY_VIS_W}" pointer-events="none"/>`
+        )
+        .join('');
+    const bodyGroup = `<g data-pt-edge-role="body" style="cursor: pointer">${bodySegments}</g>`;
+
     const nameAttrs =
         childName && parentName
             ? ` data-pt-edge-child-name="${escapeAttr(childName)}" data-pt-edge-parent-name="${escapeAttr(parentName)}"`
             : '';
-    return `<g data-pt-edge="1" data-pt-edge-child="${escapeAttr(childId)}" data-pt-edge-parent="${escapeAttr(parentId)}"${nameAttrs} style="cursor: grab">${hitArea}${arrow}</g>`;
+    return `<g data-pt-edge="1" data-pt-edge-child="${escapeAttr(childId)}" data-pt-edge-parent="${escapeAttr(parentId)}"${nameAttrs}>${tipGroup}${bodyGroup}</g>`;
 }
 
 function renderComputedEdge(
@@ -49,21 +62,16 @@ function renderComputedEdge(
     interactive: boolean
 ): string {
     const color = palette[e.colorIndex % palette.length];
-    const arrow = interactive
-        ? interactiveHollowArrow(
-              e.arrow.x,
-              e.arrow.y,
-              color,
-              e.childId,
-              e.parentId,
-              e.childName,
-              e.parentName
-          )
-        : hollowArrow(e.arrow.x, e.arrow.y, color);
-    const lines = e.segments
-        .map(s => Line({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, stroke: color }))
-        .join('');
-    return arrow + lines;
+    if (!interactive) {
+        const arrow = hollowArrow(e.arrow.x, e.arrow.y, color);
+        const lines = e.segments
+            .map(s =>
+                Line({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, stroke: color })
+            )
+            .join('');
+        return arrow + lines;
+    }
+    return interactiveEdge(e, color);
 }
 
 /* =========================================================
