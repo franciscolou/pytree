@@ -6,9 +6,19 @@ export const Messages = {
             'PyTree could not query the Python type hierarchy because Pylance extension must be installed and active to show subclasses.',
     },
     hover: {
+        brand: 'PyTree',
+        icons: {
+            brand: 'list-tree',
+            showClassTree: 'type-hierarchy-super',
+            showCompleteTree: 'type-hierarchy',
+        },
         labels: {
             showClassTree: 'Show Class Tree',
             showCompleteTree: 'Show Complete Tree',
+        },
+        descriptions: {
+            showClassTree: 'Ancestors only',
+            showCompleteTree: 'Ancestors and descendants',
         },
     },
 

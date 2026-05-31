@@ -62,7 +62,7 @@ const PY_BUILTIN_TYPES = [
     'Iterator',
 ];
 
-const toolsMessages = Messages.webView.create.tools
+const toolsMessages = Messages.webView.create.tools;
 export interface ExistingModuleInfo {
     name: string;
     relativePath: string;

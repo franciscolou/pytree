@@ -13,6 +13,7 @@ export const HoverProvider: vscode.HoverProvider = {
         const md = new vscode.MarkdownString(renderClassHover(node));
 
         md.isTrusted = true;
+        md.supportThemeIcons = true;
 
         return new vscode.Hover(md);
     },
