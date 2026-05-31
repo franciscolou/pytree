@@ -6,7 +6,10 @@ export const Theme = {
 
         headerBackground: 'var(--pt-header-bg)',
         abstractHeaderBackground: 'var(--pt-abstract-header-bg)',
+        headerGradient: 'url(#pt-header-grad)',
+        abstractHeaderGradient: 'url(#pt-abstract-grad)',
         headerText: 'var(--pt-header-text)',
+        accent: 'var(--pt-accent)',
 
         filePathBackground: 'var(--pt-filepath-bg)',
         filePathText: 'var(--pt-filepath-text)',

@@ -274,6 +274,8 @@ document.getElementById('export-as-svg')!.addEventListener('click', () => {
     const varNames = [
         '--pt-bg', '--pt-panel-bg', '--pt-border', '--pt-text',
         '--pt-header-bg', '--pt-abstract-header-bg', '--pt-header-text',
+        '--pt-header-bg-top', '--pt-header-bg-bot',
+        '--pt-abstract-bg-top', '--pt-abstract-bg-bot',
         '--pt-filepath-bg', '--pt-filepath-text', '--pt-section-label',
         '--pt-type', '--pt-string', '--pt-number', '--pt-attribute',
         '--pt-method', '--pt-override', '--pt-bool', '--pt-edge',

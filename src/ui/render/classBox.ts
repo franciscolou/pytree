@@ -931,16 +931,25 @@ export function renderClassBox(
         children: filePathBg + filePathTextSvg,
     });
 
-    const header = ClassBox({
-        x: 0,
-        y: 0,
-        width,
-        height: headerHeight,
-        fill: node.isAbstract
-            ? Theme.colors.abstractHeaderBackground
-            : Theme.colors.headerBackground,
-        stroke: 'none',
-    });
+    // Header: top corners rounded to match the panel, bottom edge flush so it
+    // sits seamlessly above the body. A thin accent rule separates it from the
+    // content.
+    const r = borderRadius;
+    const headerFill = node.isAbstract
+        ? Theme.colors.abstractHeaderGradient
+        : Theme.colors.headerGradient;
+    const headerPath = `M 0 ${headerHeight} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${
+        width - r
+    } 0 A ${r} ${r} 0 0 1 ${width} ${r} L ${width} ${headerHeight} Z`;
+    const header =
+        `<path d="${headerPath}" fill="${headerFill}" />` +
+        Line({
+            x1: 0,
+            y1: headerHeight - 0.5,
+            x2: width,
+            y2: headerHeight - 0.5,
+            stroke: 'rgba(0,0,0,0.18)',
+        });
 
     const title = NavGroup({
         fileUri: node.fileUri,

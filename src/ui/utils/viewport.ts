@@ -6,13 +6,42 @@ import type { FilterInfo } from '../components/WebViewOptions';
 import type { ViewportConfig } from '../viewport/types';
 
 export function renderBaseStyles(): string {
-    return `<style>
+    // Gradient defs live inside the SVG document so they travel with the
+    // exported clone. Stops reference the theme CSS vars, which the SVG export
+    // path bakes into a :root block (see viewport client `export-as-svg`).
+    const defs = `<defs>
+    <linearGradient id="pt-header-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--pt-header-bg-top)"/>
+        <stop offset="100%" stop-color="var(--pt-header-bg-bot)"/>
+    </linearGradient>
+    <linearGradient id="pt-abstract-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--pt-abstract-bg-top)"/>
+        <stop offset="100%" stop-color="var(--pt-abstract-bg-bot)"/>
+    </linearGradient>
+</defs>`;
+
+    return `${defs}<style>
     text {
         font-family: ${Theme.font.family};
     }
 
     body, #svgRoot {
         background: ${Theme.colors.background};
+    }
+
+    /* Soft elevation on every class box; dropped while actively zooming so the
+       wheel stays smooth, and on huge (lazy) trees where hundreds of filters
+       would jank the pan. */
+    [data-pt-box] {
+        filter: drop-shadow(0 2px 5px rgba(0,0,0,0.32));
+        transition: filter 0.12s ease;
+    }
+    [data-pt-box]:hover {
+        filter: drop-shadow(0 5px 13px rgba(0,0,0,0.45));
+    }
+    #svgRoot.zooming [data-pt-box],
+    #svgRoot.lazy-tree [data-pt-box] {
+        filter: none;
     }
 
     [data-pt-role="class"]:hover text {
@@ -42,20 +71,21 @@ function renderClientStyles(): string {
     return `<style>
   #find-bar button {
     background: transparent;
-    border: 1px solid var(--pt-border);
+    border: 1px solid var(--pt-glass-border);
     color: var(--pt-text);
-    border-radius: 3px;
+    border-radius: 6px;
     cursor: pointer;
-    padding: 2px 8px;
+    padding: 3px 8px;
     font-size: 11px;
+    transition: background 0.12s ease, border-color 0.12s ease;
   }
-  #find-bar button:hover { background: var(--pt-border); }
+  #find-bar button:hover { background: var(--pt-glass-hover); }
   #find-close { border: none !important; color: #888 !important; padding: 2px 5px !important; }
   #find-close:hover { color: var(--pt-text) !important; background: transparent !important; }
-  #find-input:focus { outline: 1px solid #007acc; }
+  #find-input:focus { outline: none; border-color: var(--pt-accent) !important; box-shadow: 0 0 0 3px var(--pt-focus-ring); }
   #paths-toggle label { cursor: pointer; user-select: none; }
-  #paths-toggle input { cursor: pointer; }
-  .find-toggle.active { background: rgba(0,122,204,0.25) !important; border-color: #007acc !important; }
+  #paths-toggle input { cursor: pointer; accent-color: var(--pt-accent); }
+  .find-toggle.active { background: var(--pt-accent-soft) !important; border-color: var(--pt-accent) !important; color: var(--pt-accent) !important; }
   [data-pt-edge-role="tip"]:hover polygon[fill="none"] {
     transform-box: fill-box;
     transform-origin: top center;
@@ -66,17 +96,19 @@ function renderClientStyles(): string {
   #edge-tooltip, #nav-tooltip {
     position: fixed;
     display: none;
-    background: var(--pt-panel-bg, #1e1e1e);
-    border: 1px solid var(--pt-border, #444);
+    background: var(--pt-glass-bg, #1e1e1e);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid var(--pt-glass-border, #444);
     color: var(--pt-text, #ccc);
     font-size: 12px;
     font-family: monospace;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 5px 9px;
+    border-radius: 7px;
     pointer-events: none;
     z-index: 2000;
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    box-shadow: var(--pt-shadow-float);
   }
 </style>`;
 }

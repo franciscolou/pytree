@@ -7,7 +7,7 @@ export const UI = {
         sectionGap: 10,
         lineHeight: 20,
         sidePadding: 32,
-        borderRadius: 6,
+        borderRadius: 10,
         charWidth: 8.8,
         sectionTopPadding: 25,
 

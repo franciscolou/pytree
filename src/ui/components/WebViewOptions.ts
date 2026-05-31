@@ -38,24 +38,29 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     return `
 <style>
   #export-btn {
-    background: var(--pt-panel-bg);
-    transition: background 0.15s ease;
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    transition: background 0.15s ease, border-color 0.15s ease;
   }
   #export-btn:hover {
-    background: var(--pt-border);
+    background: var(--pt-glass-hover);
+    border-color: var(--pt-accent);
   }
   #filter-info {
     position: relative;
   }
   #filter-info-chip {
-    background: var(--pt-panel-bg);
-    border: 1px solid var(--pt-border);
-    border-radius: 6px;
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: 9px;
     padding: 6px 10px;
     display: flex;
     align-items: center;
     gap: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--pt-shadow-float);
     cursor: default;
     color: var(--pt-text);
     font-size: 12px;
@@ -63,16 +68,18 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     transition: background 0.15s ease;
   }
   #filter-info-chip:hover {
-    background: var(--pt-border);
+    background: var(--pt-glass-hover);
   }
   #filter-info-popup {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     right: 0;
-    background: var(--pt-panel-bg);
-    border: 1px solid var(--pt-border);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: 10px;
+    box-shadow: var(--pt-shadow-float);
     overflow: hidden;
     opacity: 0;
     transform: translateY(-4px);
@@ -111,16 +118,18 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     text-overflow: ellipsis;
   }
   .filter-info-item:hover {
-    background: var(--pt-border);
+    background: var(--pt-glass-hover);
   }
   #export-menu {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     right: 0;
-    background: var(--pt-panel-bg);
-    border: 1px solid var(--pt-border);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: 10px;
+    box-shadow: var(--pt-shadow-float);
     overflow: hidden;
     opacity: 0;
     transform: translateY(-4px);
@@ -147,7 +156,8 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     transition: background 0.1s ease;
   }
   .export-menu-item:hover {
-    background: var(--pt-border);
+    background: var(--pt-accent-soft);
+    color: var(--pt-accent);
   }
 </style>
 <div
@@ -166,13 +176,13 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
         <div
             id="export-btn"
             style="
-                border: 1px solid var(--pt-border);
-                border-radius: 6px;
+                border: 1px solid var(--pt-glass-border);
+                border-radius: 9px;
                 padding: 6px 10px;
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+                box-shadow: var(--pt-shadow-float);
                 cursor: pointer;
                 color: var(--pt-text);
                 font-size: 12px;
@@ -213,20 +223,22 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     <div
         id="paths-toggle"
         style="
-            background: var(--pt-panel-bg);
-            border: 1px solid var(--pt-border);
-            border-radius: 6px;
+            background: var(--pt-glass-bg);
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            backdrop-filter: blur(16px) saturate(150%);
+            border: 1px solid var(--pt-glass-border);
+            border-radius: 9px;
             padding: 6px 10px;
             display: flex;
             align-items: center;
             gap: 6px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            box-shadow: var(--pt-shadow-float);
         "
     >
         <input
             type="checkbox"
             id="show-paths-cb"
-            style="outline: none;"
+            style="outline: none; accent-color: var(--pt-accent);"
         />
 
         <label

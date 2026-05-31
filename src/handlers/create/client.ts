@@ -385,6 +385,11 @@ function applyTransform(): void {
         'px) scale(' +
         state.pan.scale +
         ')';
+    // Keep the dotted background grid locked to the world coordinates so it
+    // pans and zooms together with the boxes (infinite-canvas feel).
+    const cell = 26 * state.pan.scale;
+    host.style.backgroundSize = cell + 'px ' + cell + 'px';
+    host.style.backgroundPosition = state.pan.x + 'px ' + state.pan.y + 'px';
 }
 
 function clientToWorld(cx: number, cy: number): { x: number; y: number } {

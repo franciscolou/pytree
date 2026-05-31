@@ -5,17 +5,19 @@ export function FindBar(): string {
     style="
         display: none;
         position: fixed;
-        top: 10px;
+        top: 12px;
         left: 50%;
         transform: translateX(-50%);
-        background: var(--pt-panel-bg);
-        border: 1px solid var(--pt-border);
-        border-radius: 6px;
-        padding: 6px 10px;
+        background: var(--pt-glass-bg);
+        -webkit-backdrop-filter: blur(16px) saturate(150%);
+        backdrop-filter: blur(16px) saturate(150%);
+        border: 1px solid var(--pt-glass-border);
+        border-radius: 12px;
+        padding: 7px 10px;
         align-items: center;
         gap: 6px;
         z-index: 1000;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        box-shadow: var(--pt-shadow-float);
     "
 >
     <input
@@ -26,10 +28,10 @@ export function FindBar(): string {
         spellcheck="false"
         style="
             background: var(--pt-bg);
-            border: 1px solid var(--pt-border);
+            border: 1px solid var(--pt-glass-border);
             color: var(--pt-text);
-            padding: 4px 8px;
-            border-radius: 3px;
+            padding: 5px 9px;
+            border-radius: 7px;
             outline: none;
             width: 200px;
             font-size: 13px;

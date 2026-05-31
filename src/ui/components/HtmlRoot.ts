@@ -9,8 +9,34 @@ export function renderRootStyles(): string {
 
       /* Header */
       --pt-header-bg:          #4ec9b0;
+      --pt-header-bg-top:      #5bd9bd;
+      --pt-header-bg-bot:      #36a98f;
       --pt-abstract-header-bg: #f2f7d7;
-      --pt-header-text:        #000000;
+      --pt-abstract-bg-top:    #f7f9e2;
+      --pt-abstract-bg-bot:    #dfeaac;
+      --pt-header-text:        #052b24;
+
+      /* Brand accent — unifies selection, focus rings and primary actions
+         across the auto-tree views and the Create board. */
+      --pt-accent:          #4ec9b0;
+      --pt-accent-2:        #36a98f;
+      --pt-accent-contrast: #052b24;
+      --pt-accent-soft:     rgba(78, 201, 176, 0.16);
+      --pt-focus-ring:      rgba(78, 201, 176, 0.55);
+      --pt-edge-target:     #e8c46a;
+      --pt-invalid:         #d9645a;
+
+      /* Elevation + shape */
+      --pt-radius:    11px;
+      --pt-radius-sm: 7px;
+      --pt-shadow-box:   0 1px 2px rgba(0,0,0,0.45), 0 6px 18px rgba(0,0,0,0.28);
+      --pt-shadow-hover: 0 2px 6px rgba(0,0,0,0.5), 0 14px 34px rgba(0,0,0,0.42);
+      --pt-shadow-float: 0 10px 36px rgba(0,0,0,0.5);
+
+      /* Glassy floating surfaces (toolbars, popovers, find bar) */
+      --pt-glass-bg:     rgba(32, 33, 36, 0.78);
+      --pt-glass-border: rgba(255, 255, 255, 0.10);
+      --pt-glass-hover:  rgba(255, 255, 255, 0.08);
 
       /* File path section */
       --pt-filepath-bg:   #1a1a1a;
@@ -85,6 +111,17 @@ export function renderRootStyles(): string {
       --pt-filepath-text: #5a5a5a;
 
       --pt-section-label: #909090;
+
+      --pt-header-bg-top:   #62dcc1;
+      --pt-header-bg-bot:   #2f9d83;
+      --pt-accent-contrast: #042019;
+      --pt-accent-soft:     rgba(54, 169, 143, 0.16);
+      --pt-shadow-box:   0 1px 2px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.10);
+      --pt-shadow-hover: 0 2px 6px rgba(0,0,0,0.18), 0 14px 34px rgba(0,0,0,0.16);
+      --pt-shadow-float: 0 10px 36px rgba(0,0,0,0.20);
+      --pt-glass-bg:     rgba(248, 248, 250, 0.82);
+      --pt-glass-border: rgba(0, 0, 0, 0.09);
+      --pt-glass-hover:  rgba(0, 0, 0, 0.06);
   }
 </style>`;
 }
