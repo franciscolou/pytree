@@ -4,14 +4,19 @@ All notable changes to the "PyTree" extension will be documented in this file.
 
 ## Unreleased
 
-## Added
+### Added
 
+- Added **Pick Paths** feature (selects classes defined in chosen files/folders and renders them with their full inheritance, even when ancestors or descendants live outside the selection)
+- Added **All Except** feature (renders the project tree of the workspace excluding the selected files/folders — useful for filtering out test directories or generated code)
+- Added **Create** feature: an interactive board to design classes visually (draw class boxes, connect inheritance edges, group classes into modules) and generate the corresponding Python source files, with dependency-ordered class definitions, cross-module relative imports, and `ABC`/`abstractmethod` scaffolding
+- Clicking an inheritance arrow now recenters the view on a related class — the arrow tip focuses the subclass, the arrow body focuses the superclass
 - Variadic parameters (\*args, \*\*kwargs) now are displayed in method signatures
-- Added **Pick Paths** (selects classes defined in chosen files/folders and renders them with their full inheritance, even when ancestors or descendants live outside the selection)
-- Added **All Except** (renders the project tree of the workspace excluding the selected files/folders — useful for filtering out test directories or generated code)
 
 ### Changed
 
+- Refreshed the visual design across every webview and the in-editor hover card — gradient headers, softer elevation, a unified accent color, and frosted-glass toolbars/menus
+- Increased the number of distinct colors used for inheritance edges so adjacent edges are easier to tell apart
+- Large workspaces now load faster: trees with many classes hydrate their box content lazily as you pan, and the workspace is indexed in the background on startup so the first command is responsive
 - **Project Tree** now displays larger trees at the center of the grid, instead of top-left to down-right direction.
 - Fixed an issue where command executions with the same tree type and module, without file changes, reused the panel even when the class was different.
 - Fixed (again) a parsing issue where classes declared with PEP 695 (Type Parameter Syntax Enhancement) notation got their inheritances ignored

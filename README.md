@@ -75,6 +75,32 @@ The inverse of Pick Paths: renders a project-tree view of the workspace **exclud
 
 ---
 
+### Create
+
+An interactive board for **designing classes visually and generating Python source files** from the diagram. Instead of reading an existing object model, you draw one: 'lay out classes, connect inheritance, group them into modules, and PyTree writes the `.py` files for you.
+
+**Trigger:** Command Palette: `PyTree: Create`
+
+The toolbar exposes five drawing tools plus two actions:
+
+| Tool             | Shortcut | What it does                                                                                         |
+| ---------------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| **Cursor**       | `V`      | Drag boxes around, click a header to toggle the class abstract, double-click the name to rename it    |
+| **Box**          | `B`      | Click anywhere on the canvas to drop a new class box                                                  |
+| **Edge**         | `E`      | Click the child class, then the parent class, to connect them with an inheritance edge                |
+| **Module**       | `M`      | Drag a rectangle around one or more classes to group them into a module (each module becomes a file)  |
+| **Erase**        | `X`      | Click a box or an edge to delete it                                                                   |
+| **Arrange**      | —        | Auto-layouts the whole board using the same layering engine as the tree views                         |
+| **Create**       | —        | Generates the Python files from the current board                                                     |
+
+Inside each box you can add **attributes**, **properties**, and **methods** with their types and default values, and mark methods as abstract, static, or class methods. The box renders them with the same colors and `(abc)` markers used everywhere else in PyTree. The canvas is an infinite surface: pan by dragging (also doable with scroll button), zoom with the scroll wheel.
+
+When you click **Create**, each module becomes a `.py` file: classes are emitted in dependency order (a base always precedes its subclasses), cross-module inheritance produces the relative `import` statements, and abstract elements get their `ABC`/`abstractmethod` scaffolding. If a target file already exists, PyTree asks before overwriting.
+
+<!-- VIDEO PLACEHOLDER: create board demo -->
+
+---
+
 ### Change Inheritance (Drag & Drop)
 
 In any tree view, click and drag an inheritance arrow off its current parent and drop it onto a different class to rewrite the inheritance directly in the source file. A confirmation dialog is always shown before the change is applied. If the new parent introduces attribute or method conflicts with the child, those conflicts are listed upfront so you can decide whether to proceed; otherwise a plain confirmation prompt asks you to verify the change. Cycles (where the new parent is already a descendant of the child) are blocked.
@@ -137,6 +163,7 @@ Every tree view is fully interactive:
 | **Find**               | `Ctrl+F` / `Cmd+F` — searches class names, methods, atributes, any text            |
 | **Navigate matches**   | `Enter` / `Shift+Enter`, or the Next / Prev buttons                                |
 | **Jump to source**     | Click any class name, attribute, or method — opens the file at the definition line |
+| **Center view on class**| Click an inheritance arrow — the tip recenters on the subclass, the body on the superclass |
 | **Change inheritance** | Drag an inheritance arrow onto a different class — confirms before rewriting       |
 | **Export**             | Click the Export button (top-right) → choose SVG or HTML → save dialog             |
 
@@ -154,6 +181,7 @@ Pan position, zoom level, and the file-paths checkbox state are persisted per we
 | `pytree.pickClasses`           | PyTree: Pick Classes...     | —                |
 | `pytree.pickPaths`             | PyTree: Pick Paths...       | —                |
 | `pytree.allExcept`             | PyTree: All Except...       | —                |
+| `pytree.create`                | PyTree: Create              | —                |
 
 ---
 
