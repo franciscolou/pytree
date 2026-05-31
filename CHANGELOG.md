@@ -4,6 +4,10 @@ All notable changes to the "PyTree" extension will be documented in this file.
 
 ## Unreleased
 
+- Currently studying possible new features and preventive fixes for potential bugs.
+
+## [0.2.0] - 2026-05-31
+
 ### Added
 
 - Added **Pick Paths** feature (selects classes defined in chosen files/folders and renders them with their full inheritance, even when ancestors or descendants live outside the selection)
