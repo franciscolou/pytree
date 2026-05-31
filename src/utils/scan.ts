@@ -19,9 +19,21 @@ const TEXT_DECODER = new TextDecoder('utf-8');
 let scanCache: Map<string, ClassNode> | null = null;
 let scanInProgress: Promise<Map<string, ClassNode>> | null = null;
 
+// Monotonic counter bumped on every workspace mutation we observe (file
+// create/delete/change/save, or an explicit post-edit invalidation). Webview
+// panel reuse compares this instead of re-reading every file's version off
+// disk: a closed file can only change via one of those events, and an open
+// file's unsaved edits are caught separately via its live `doc.version`.
+let scanGeneration = 0;
+
+export function getScanGeneration(): number {
+    return scanGeneration;
+}
+
 function invalidate(): void {
     scanCache = null;
     scanInProgress = null;
+    scanGeneration++;
 }
 
 export function invalidateScanCache(): void {

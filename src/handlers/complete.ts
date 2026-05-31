@@ -63,9 +63,16 @@ export async function showCompleteClassTree(
             classes
         );
 
-        const fileUris = [
-            ...new Set([...classes.values()].map(n => n.fileUri)),
-        ];
+        // Only the files of classes actually drawn in this tree gate panel
+        // reuse — not every file in the workspace scan. The full `classes`
+        // map is still handed to the panel for inheritance-edit validation.
+        const treeFiles = new Set<string>([node.fileUri]);
+        for (const layer of [...ancestors, ...descendants]) {
+            for (const n of layer) {
+                treeFiles.add(n.fileUri);
+            }
+        }
+        const fileUris = [...treeFiles];
         return {
             html: renderClassTree(node, ancestors, descendants),
             fileUris,

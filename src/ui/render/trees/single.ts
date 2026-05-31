@@ -13,17 +13,8 @@ import {
 } from '../../utils/layout';
 import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
 
-function measureLayerMaxHeight(
-    layer: ClassNode[],
-    allNodes: Map<string, ClassNode>
-): number {
-    return Math.max(
-        ...layer.map(
-            node =>
-                measureClassBox(node, collectInheritedNames(node, allNodes))
-                    .height
-        )
-    );
+function measureLayerMaxHeight(layer: ClassNode[]): number {
+    return Math.max(...layer.map(node => measureClassBox(node).height));
 }
 
 function positionLayer(
@@ -35,7 +26,7 @@ function positionLayer(
     lazyBodies: Array<[string, string]>
 ): { svgs: string[]; positions: BoxMeasures[] } {
     const inherited = layer.map(node => collectInheritedNames(node, allNodes));
-    const sizes = layer.map((node, i) => measureClassBox(node, inherited[i]));
+    const sizes = layer.map(node => measureClassBox(node));
 
     const totalWidth =
         sizes.reduce((sum, s) => sum + s.width, 0) +
@@ -94,9 +85,7 @@ export function buildTreeLayout(
     }
 
     const layerHalfWidth = (layer: ClassNode[]): number => {
-        const sizes = layer.map(node =>
-            measureClassBox(node, collectInheritedNames(node, allNodes))
-        );
+        const sizes = layer.map(node => measureClassBox(node));
         const total =
             sizes.reduce((sum, s) => sum + s.width, 0) +
             (layer.length - 1) * horizontalGap;
@@ -135,7 +124,7 @@ export function buildTreeLayout(
         );
         orderedAncestorLayers.push(ordered);
         halfWidth = Math.max(halfWidth, layerHalfWidth(ordered));
-        currentY -= verticalGap + measureLayerMaxHeight(ordered, allNodes);
+        currentY -= verticalGap + measureLayerMaxHeight(ordered);
         const { svgs, positions } = positionLayer(
             ordered,
             currentY,

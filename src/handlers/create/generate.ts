@@ -82,11 +82,6 @@ function ensurePyExt(p: string): string {
     return p.endsWith('.py') ? p : `${p}.py`;
 }
 
-function moduleDottedFromPath(relPath: string): string {
-    const noExt = relPath.replace(/\.py$/i, '');
-    return noExt.split(/[\\/]+/).filter(Boolean).join('.');
-}
-
 function resolveBoxModules(state: CreateBoardState): Map<string, ResolvedBoxModule> {
     const moduleById = new Map(state.modules.map(m => [m.id, m]));
     const byId = new Map<string, ResolvedBoxModule>();
@@ -229,7 +224,7 @@ function renderMethod(m: CreateMethod): string {
         .join(', ');
     const ret = m.returnType ? ` -> ${m.returnType}` : '';
     const sig = `    def ${m.name}(${paramStr})${ret}:`;
-    const body = m.isAbstract ? '        ...' : '        ...';
+    const body = '        ...';
     return [...decorators, sig, body].join('\n');
 }
 
@@ -252,10 +247,6 @@ function relativeImport(fromPath: string, toPath: string, name: string): string 
     const dots = '.'.repeat(upSteps + 1);
     const modulePart = downParts.join('.');
     return `from ${dots}${modulePart} import ${name}`;
-}
-
-function absoluteImport(toPath: string, name: string): string {
-    return `from ${moduleDottedFromPath(toPath)} import ${name}`;
 }
 
 function buildImports(
@@ -397,7 +388,3 @@ export function generateFiles(state: CreateBoardState): GeneratedFile[] {
 
     return files;
 }
-
-// Helper: derive a flat, dot-style absolute import (currently unused — kept for
-// potential cross-package imports). Suppress unused-vars lint when needed.
-export const _absoluteImport = absoluteImport;

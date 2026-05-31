@@ -21,10 +21,30 @@ export function setWorkspaceUri(uri: string): void {
     _workspaceUri = uri.replace(/\/?$/, '');
 }
 
+type InheritedNames = {
+    attrs: Set<string>;
+    props: Set<string>;
+    methods: Set<string>;
+};
+
+// Memoized per `ClassNode` object. The result depends on the node plus the
+// ancestor membership of `allNodes`, so the cached entry is keyed by node
+// identity and guarded on the `allNodes` map identity (each render/tree builds
+// its own map). `ClassNode`s are rebuilt on every parse, so stale objects are
+// dropped by the WeakMap without any explicit invalidation.
+const inheritedCache = new WeakMap<
+    ClassNode,
+    { allNodes: Map<string, ClassNode>; value: InheritedNames }
+>();
+
 export function collectInheritedNames(
     node: ClassNode,
     allNodes: Map<string, ClassNode>
-): { attrs: Set<string>; props: Set<string>; methods: Set<string> } {
+): InheritedNames {
+    const cached = inheritedCache.get(node);
+    if (cached && cached.allNodes === allNodes) {
+        return cached.value;
+    }
     const attrs = new Set<string>();
     const props = new Set<string>();
     const methods = new Set<string>();
@@ -57,7 +77,9 @@ export function collectInheritedNames(
             }
         }
     }
-    return { attrs, props, methods };
+    const value: InheritedNames = { attrs, props, methods };
+    inheritedCache.set(node, { allNodes, value });
+    return value;
 }
 
 function renderParamName(name: string, color: string): string {
@@ -353,10 +375,18 @@ export function computeBoxWidth(
     );
 }
 
+// Memoized per `ClassNode` object: the measurement (method wrapping, width)
+// depends only on the node's own members. Called 3–4× per node across the
+// measure/position/render passes; the WeakMap collapses that to one compute.
+const measureCache = new WeakMap<ClassNode, { width: number; height: number }>();
+
 export function measureClassBox(
-    node: ClassNode,
-    _inherited: { attrs: Set<string>; methods: Set<string> }
+    node: ClassNode
 ): { width: number; height: number } {
+    const memo = measureCache.get(node);
+    if (memo) {
+        return memo;
+    }
     const {
         headerHeight,
         padding,
@@ -433,7 +463,9 @@ export function measureClassBox(
         }
     }
 
-    return { width, height: y + padding };
+    const measured = { width, height: y + padding };
+    measureCache.set(node, measured);
+    return measured;
 }
 
 function renderSectionLabel(

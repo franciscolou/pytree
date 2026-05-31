@@ -19,14 +19,11 @@ const COMPONENT_GAP = 400;
 
 function computeComponentWidth(
     layers: ClassNode[][],
-    allNodes: Map<string, ClassNode>,
     horizontalGap: number
 ): number {
     return Math.max(
         ...layers.map(layer => {
-            const sizes = layer.map(node =>
-                measureClassBox(node, collectInheritedNames(node, allNodes))
-            );
+            const sizes = layer.map(node => measureClassBox(node));
             return (
                 sizes.reduce((sum, s) => sum + s.width, 0) +
                 Math.max(0, layer.length - 1) * horizontalGap
@@ -37,17 +34,10 @@ function computeComponentWidth(
 
 function computeComponentHeight(
     layers: ClassNode[][],
-    allNodes: Map<string, ClassNode>,
     verticalGap: number
 ): number {
     const layerHeights = layers.map(layer =>
-        Math.max(
-            ...layer.map(
-                node =>
-                    measureClassBox(node, collectInheritedNames(node, allNodes))
-                        .height
-            )
-        )
+        Math.max(...layer.map(node => measureClassBox(node).height))
     );
     return (
         layerHeights.reduce((sum, h) => sum + h, 0) +
@@ -65,7 +55,7 @@ function positionLayerAt(
     lazyBodies: Array<[string, string]>
 ): { svgs: string[]; positions: BoxMeasures[] } {
     const inherited = layer.map(node => collectInheritedNames(node, allNodes));
-    const sizes = layer.map((node, i) => measureClassBox(node, inherited[i]));
+    const sizes = layer.map(node => measureClassBox(node));
     const totalWidth =
         sizes.reduce((sum, s) => sum + s.width, 0) +
         Math.max(0, layer.length - 1) * horizontalGap;
@@ -143,10 +133,10 @@ export function renderProjectTree(
     const rows = Math.ceil(N / cols);
 
     const widths = componentLayers.map(layers =>
-        computeComponentWidth(layers, allNodes, horizontalGap)
+        computeComponentWidth(layers, horizontalGap)
     );
     const heights = componentLayers.map(layers =>
-        computeComponentHeight(layers, allNodes, verticalGap)
+        computeComponentHeight(layers, verticalGap)
     );
 
     // Assign components to grid cells: biggest (index 0) → most central cell.

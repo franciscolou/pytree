@@ -8,7 +8,7 @@ import {
     detectConflicts,
     rewriteInheritance,
 } from './inheritance';
-import { invalidateScanCache } from './scan';
+import { invalidateScanCache, getScanGeneration } from './scan';
 
 export interface PanelState {
     html: string;
@@ -21,25 +21,25 @@ export type PanelStateProvider = () => Promise<PanelState | null>;
 type PanelEntry = {
     panel: vscode.WebviewPanel;
     fileVersions: Map<string, number>;
+    generation: number;
     extraKey: string;
     provider?: PanelStateProvider;
 };
 
 const panelRegistry = new Map<string, PanelEntry>();
 
-async function getFileVersions(
-    fileUris: string[]
-): Promise<Map<string, number>> {
+// Versions of the involved files, read only from already-open documents — no
+// `openTextDocument`, which would force-load (and parse) every file in the
+// workspace just to compare a number. A file that isn't open can't have
+// unsaved changes; its on-disk mutations are covered by the scan generation
+// counter, checked alongside this map in `panelEntryMatches`.
+function getFileVersions(fileUris: string[]): Map<string, number> {
+    const openVersions = new Map<string, number>(
+        vscode.workspace.textDocuments.map(d => [d.uri.toString(), d.version])
+    );
     const versions = new Map<string, number>();
     for (const uri of fileUris) {
-        try {
-            const doc = await vscode.workspace.openTextDocument(
-                vscode.Uri.parse(uri)
-            );
-            versions.set(uri, doc.version);
-        } catch {
-            versions.set(uri, -1);
-        }
+        versions.set(uri, openVersions.get(uri) ?? -1);
     }
     return versions;
 }
@@ -50,6 +50,9 @@ function panelEntryMatches(
     extraKey: string
 ): boolean {
     if (entry.extraKey !== extraKey) {
+        return false;
+    }
+    if (entry.generation !== getScanGeneration()) {
         return false;
     }
     if (entry.fileVersions.size !== fileVersions.size) {
@@ -140,7 +143,8 @@ async function refreshPanel(viewType: string): Promise<void> {
             return;
         }
         entry.panel.webview.html = state.html;
-        entry.fileVersions = await getFileVersions(state.fileUris);
+        entry.fileVersions = getFileVersions(state.fileUris);
+        entry.generation = getScanGeneration();
     } catch {
         // ignore
     }
@@ -300,7 +304,7 @@ export async function openWebview(
     provider?: PanelStateProvider
 ): Promise<void> {
     if (fileUris?.length) {
-        const currentVersions = await getFileVersions(fileUris);
+        const currentVersions = getFileVersions(fileUris);
         const entry = panelRegistry.get(viewType);
         if (entry && panelEntryMatches(entry, currentVersions, extraKey)) {
             entry.panel.reveal();
@@ -311,6 +315,7 @@ export async function openWebview(
         panelRegistry.set(viewType, {
             panel,
             fileVersions: currentVersions,
+            generation: getScanGeneration(),
             extraKey,
             provider,
         });

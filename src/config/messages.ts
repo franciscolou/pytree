@@ -31,6 +31,32 @@ export const Messages = {
             showAllFilePaths: 'Show all file paths',
             export: 'Export',
         },
+        create: {
+            tools: {
+                cursor: {
+                    title: "Cursor (V)",
+                    description: "Drag boxes, click header to toggle abstract, double-click name to rename"
+                },
+                addBox: {
+                    title: "Add Box (B)",
+                    description: "Click on the canvas to add a class box"
+                },
+                addEdge: {
+                    title: "Add Edge (E)",
+                    description: "Click first box (child), then second box (parent) to connect"
+                },
+                module: {
+                    title: "Module (M)",
+                    description: "Drag a rectangle around classes to group them in a module"
+                },
+                erase: {
+                    title: "Erase (X)",
+                    description: "Click a box or edge to delete it"
+                },
+                arrange: "Arrange layout",
+                confirm: "Create Python files"
+            }
+        }
     },
 
     ui: {

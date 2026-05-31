@@ -34,24 +34,24 @@ export async function showCreateBoard(
     });
 }
 
-async function readEdgeLayoutBundle(
-    context: vscode.ExtensionContext
+async function readDistBundle(
+    context: vscode.ExtensionContext,
+    file: string
 ): Promise<string> {
-    // The webview reuses the exact same lane-assignment / highway-routing
-    // logic the auto-tree SVG renderer uses, bundled as an IIFE that attaches
-    // to `window.PTEdgeLayout`. esbuild emits this file alongside the
-    // extension bundle (see esbuild.js).
-    const uri = vscode.Uri.joinPath(
-        context.extensionUri,
-        'dist',
-        'edgeLayout.client.js'
-    );
+    // The board reuses two esbuild bundles emitted alongside the extension
+    // (see esbuild.js): `edgeLayout.client.js` (the shared lane-assignment /
+    // highway-routing geometry, attached to `window.PTEdgeLayout`) and
+    // `createBoard.client.js` (this board's own runtime).
+    const uri = vscode.Uri.joinPath(context.extensionUri, 'dist', file);
     const bytes = await vscode.workspace.fs.readFile(uri);
     return Buffer.from(bytes).toString('utf-8');
 }
 
 async function buildHtml(context: vscode.ExtensionContext): Promise<string> {
-    const edgeLayoutScript = await readEdgeLayoutBundle(context);
+    const [edgeLayoutScript, clientScript] = await Promise.all([
+        readDistBundle(context, 'edgeLayout.client.js'),
+        readDistBundle(context, 'createBoard.client.js'),
+    ]);
     const classNames: string[] = [];
     const moduleSet = new Map<string, ExistingModuleInfo>();
     try {
@@ -93,7 +93,8 @@ async function buildHtml(context: vscode.ExtensionContext): Promise<string> {
     return renderCreateBoard(
         classNames,
         [...moduleSet.values()],
-        edgeLayoutScript
+        edgeLayoutScript,
+        clientScript
     );
 }
 

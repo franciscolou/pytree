@@ -105,22 +105,46 @@ async function main() {
             ),
         ],
     });
+    // PyTree: Create board client runtime. Plain TypeScript (same rationale as
+    // the viewport client) bundled as a self-running IIFE; it references the
+    // shared edge geometry through the `PTEdgeLayout` global loaded ahead of
+    // it, importing only its types.
+    const createBoardClientCtx = await esbuild.context({
+        entryPoints: ['src/handlers/create/client.ts'],
+        bundle: true,
+        format: 'iife',
+        platform: 'browser',
+        outfile: 'dist/createBoard.client.js',
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        logLevel: 'silent',
+        plugins: [
+            problemMatcherPlugin(
+                'createBoard-client',
+                'dist/createBoard.client.js'
+            ),
+        ],
+    });
     if (watch) {
         await Promise.all([
             ctx.watch(),
             edgeLayoutCtx.watch(),
             viewportClientCtx.watch(),
+            createBoardClientCtx.watch(),
         ]);
     } else {
         await Promise.all([
             ctx.rebuild(),
             edgeLayoutCtx.rebuild(),
             viewportClientCtx.rebuild(),
+            createBoardClientCtx.rebuild(),
         ]);
         await Promise.all([
             ctx.dispose(),
             edgeLayoutCtx.dispose(),
             viewportClientCtx.dispose(),
+            createBoardClientCtx.dispose(),
         ]);
     }
 }
