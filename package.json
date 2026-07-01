@@ -3,7 +3,7 @@
     "icon": "assets/images/icon.png",
     "displayName": "PyTree",
     "description": "Helper extension to visualize inheritance trees for Python classes.",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "license": "MIT",
     "publisher": "franciscolou",
     "repository": {

@@ -6,6 +6,12 @@ All notable changes to the "PyTree" extension will be documented in this file.
 
 - Currently studying possible new features and preventive fixes for potential bugs.
 
+## [0.2.1] - 2026-06-30
+
+### Changed
+
+- Changed extension main icon and open file icon
+
 ## [0.2.0] - 2026-05-31
 
 ### Added
