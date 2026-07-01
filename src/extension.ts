@@ -26,7 +26,6 @@ export function activate(context: vscode.ExtensionContext) {
     setWorkspaceUri(workspaceUri);
     initCache(context);
     context.subscriptions.push(
-        registerHoverProvider(),
         registerShowClassCommand(context),
         registerShowCompleteClassCommand(context),
         registerShowProjectTreeCommand(context),
@@ -34,7 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
         registerPickPathsCommand(context),
         registerAllExceptCommand(context),
         registerCreateCommand(context),
-        scheduleBackgroundScan()
+        scheduleBackgroundScan(),
+        registerHoverProvider()
     );
 }
 
