@@ -257,7 +257,7 @@ function setupPanel(
     );
     panel.iconPath = vscode.Uri.joinPath(
         context.extensionUri,
-        ...'assets/images/file-icon.svg'.split('/')
+        ...'assets/images/file-icon.png'.split('/')
     );
     panel.webview.html = html;
 

@@ -21,7 +21,7 @@ export async function showCreateBoard(
     );
     panel.iconPath = vscode.Uri.joinPath(
         context.extensionUri,
-        ...'assets/images/file-icon.svg'.split('/')
+        ...'assets/images/file-icon.png'.split('/')
     );
 
     const html = await buildHtml(context);
