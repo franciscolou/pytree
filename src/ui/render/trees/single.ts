@@ -11,7 +11,7 @@ import {
     orderByChildBarycenter,
     orderByParentBarycenter,
 } from '../../utils/barycenter';
-import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
+import { renderBaseStyles, renderViewportScript } from '../../webview/viewport';
 
 function measureLayerMaxHeight(layer: ClassNode[]): number {
     return Math.max(...layer.map(node => measureClassBox(node).height));

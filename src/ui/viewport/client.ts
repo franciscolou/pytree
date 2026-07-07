@@ -1,7 +1,7 @@
 // Browser-side runtime for the auto-tree webview.
 //
 // This file replaces what used to live as a giant template literal inside
-// `src/ui/utils/viewport.ts`. esbuild bundles it as a self-contained IIFE
+// `src/ui/webview/viewport.ts`. esbuild bundles it as a self-contained IIFE
 // (dist/viewport.client.js) that the renderer inlines into the webview
 // HTML. Type checking + linting now catch the bugs we hit before from
 // stringly-typed code (backticks in comments closing the template,

@@ -2,7 +2,7 @@ import { ClassNode } from '../../../types';
 import { UI } from '../../../config';
 import { Group, HtmlRoot, Svg } from '../../components';
 import { buildTreeLayout } from './single';
-import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
+import { renderBaseStyles, renderViewportScript } from '../../webview/viewport';
 
 const TREE_GAP = 300;
 

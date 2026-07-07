@@ -7,7 +7,7 @@ import {
     measureClassBox,
     collectInheritedNames,
 } from '../classBox';
-import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
+import { renderBaseStyles, renderViewportScript } from '../../webview/viewport';
 import { renderLayeredEdges } from '../edges';
 import { orderByParentBarycenter } from '../../utils/barycenter';
 
