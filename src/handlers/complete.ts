@@ -4,7 +4,7 @@ import { resolveClassNode, resolveLayeredNodes } from '../utils/resolve';
 import { Messages } from '../config';
 import { extractClasses } from '../utils/parser';
 import { scanWorkspaceClasses } from '../utils/scan';
-import { collectDescendants } from '../ui/utils/resolve';
+import { collectDescendants } from '../ui/utils/layering';
 import {
     buildAncestorLayers,
     prepareTypeHierarchyAt,

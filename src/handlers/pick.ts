@@ -3,7 +3,7 @@ import { ClassNode } from '../types';
 import { scanWorkspaceClasses } from '../utils/scan';
 import { Messages } from '../config';
 import { resolveLayeredNodes } from '../utils/resolve';
-import { collectAncestors, collectDescendants } from '../ui/utils/resolve';
+import { collectAncestors, collectDescendants } from '../ui/utils/layering';
 import { openWebview, PanelState } from '../utils/webview';
 import { renderMultiTree } from '../ui/render/trees/pick';
 

@@ -9,7 +9,7 @@ import {
 } from '../classBox';
 import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
 import { renderLayeredEdges } from '../edges';
-import { orderByParentBarycenter } from '../../utils/layout';
+import { orderByParentBarycenter } from '../../utils/barycenter';
 
 const COMPONENT_GAP = 400;
 

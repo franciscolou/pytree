@@ -7,7 +7,7 @@ import {
     buildConnectedComponents,
     collectAncestors,
     collectDescendants,
-} from '../ui/utils/resolve';
+} from '../ui/utils/layering';
 import { openWebview, PanelState } from '../utils/webview';
 import { renderProjectTree } from '../ui/render/trees/project';
 import type { FilterInfo } from '../ui/components/WebViewOptions';

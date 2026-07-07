@@ -4,7 +4,7 @@ import { scanWorkspaceClasses } from '../utils/scan';
 import {
     buildComponentLayers,
     buildConnectedComponents,
-} from '../ui/utils/resolve';
+} from '../ui/utils/layering';
 import { openWebview, PanelState } from '../utils/webview';
 import { renderProjectTree } from '../ui/render/trees/project';
 

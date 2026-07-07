@@ -1306,7 +1306,7 @@ const EDGE_ARROW_H = 10;
 
 function computeLayerOf(ids: string[]): Map<string, number> {
     // Longest-path layering on the current edge set. Same shape as
-    // src/ui/utils/resolve.ts's longestPathLayers, but op-on top of the
+    // src/ui/utils/layering.ts's longestPathLayers, but op-on top of the
     // create-board's in-memory state (no ClassNode involved).
     const idSet = new Set(ids);
     const parentsOf = new Map<string, string[]>(

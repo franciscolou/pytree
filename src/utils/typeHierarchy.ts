@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ClassNode } from '../types';
 import { extractClasses } from './parser';
-import { layerByLongestPath } from '../ui/utils/resolve';
+import { layerByLongestPath } from '../ui/utils/layering';
 
 // Pylance resolves every Python stdlib/builtin type (object, str,
 // BaseException, abc.ABC, typing.Protocol, …) to a stub under

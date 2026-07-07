@@ -10,7 +10,7 @@ import { renderAncestorEdges, renderDescendantEdges } from '../edges';
 import {
     orderByChildBarycenter,
     orderByParentBarycenter,
-} from '../../utils/layout';
+} from '../../utils/barycenter';
 import { renderBaseStyles, renderViewportScript } from '../../utils/viewport';
 
 function measureLayerMaxHeight(layer: ClassNode[]): number {
