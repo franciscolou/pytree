@@ -6,6 +6,16 @@ All notable changes to the "PyTree" extension will be documented in this file.
 
 - Currently studying possible new features and preventive fixes for potential bugs.
 
+### [0.2.3] - 2026-07-07
+
+### Added
+
+- **Descendants Tree** (`PyTree: Descendants Tree`): renders a class and only its descendants, without ancestors. Available from the command palette, by using the shortcut `Ctrl + Alt + D` and as a third option in the in-editor hover card.
+
+### Changed
+
+- Renamed **Class Tree** to **Ancestors Tree** (command palette title and in-editor hover label), to better distinguish it from the new Descendants Tree feature.
+
 ## [0.2.2] - 2026-06-30
 
 ### Changed

@@ -23,12 +23,16 @@
     "contributes": {
         "commands": [
             {
-                "command": "pytree.showClassTree",
-                "title": "PyTree: Class Tree"
+                "command": "pytree.showAncestorsTree",
+                "title": "PyTree: Ancestors Tree"
             },
             {
                 "command": "pytree.showCompleteClassTree",
                 "title": "PyTree: Complete Class Tree"
+            },
+            {
+                "command": "pytree.showDescendantsTree",
+                "title": "PyTree: Descendants Tree"
             },
             {
                 "command": "pytree.showProjectTree",
@@ -53,7 +57,7 @@
         ],
         "keybindings": [
             {
-                "command": "pytree.showClassTree",
+                "command": "pytree.showAncestorsTree",
                 "key": "ctrl+alt+space",
                 "when": "editorTextFocus && editorLangId == python"
             },

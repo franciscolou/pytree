@@ -10,7 +10,7 @@ import { openWebview, PanelState } from '../utils/webview';
 import { Messages } from '../config';
 import { renderClassTree } from '../ui/render/trees/single';
 
-export async function showClassTree(
+export async function showAncestorsTree(
     context: vscode.ExtensionContext,
     ref?: ClassRef
 ) {
@@ -58,7 +58,7 @@ export async function showClassTree(
     await openWebview(
         context,
         'pytreeClassTree',
-        Messages.webView.titles.classTree(focusNode.name),
+        Messages.webView.titles.ancestorsTree(focusNode.name),
         state.html,
         state.fileUris,
         'simple:' + focusNode.id,

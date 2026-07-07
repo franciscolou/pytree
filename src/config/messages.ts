@@ -9,16 +9,19 @@ export const Messages = {
         brand: 'PyTree',
         icons: {
             brand: 'list-tree',
-            showClassTree: 'type-hierarchy-super',
+            showAncestorsTree: 'type-hierarchy-super',
             showCompleteTree: 'type-hierarchy',
+            showDescendantsTree: 'type-hierarchy-sub',
         },
         labels: {
-            showClassTree: 'Show Class Tree',
+            showAncestorsTree: 'Show Ancestors Tree',
             showCompleteTree: 'Show Complete Tree',
+            showDescendantsTree: 'Show Descendants Tree',
         },
         descriptions: {
-            showClassTree: 'Ancestors only',
+            showAncestorsTree: 'Ancestors only',
             showCompleteTree: 'Ancestors and descendants',
+            showDescendantsTree: 'Descendants only',
         },
     },
 
@@ -29,9 +32,10 @@ export const Messages = {
 
     webView: {
         titles: {
-            classTree: (name: string) => `PyTree: ${name} Inheritance`,
+            ancestorsTree: (name: string) => `PyTree: ${name} Inheritance`,
             completeClassTree: (name: string) =>
                 `PyTree: ${name} Complete Inheritance`,
+            descendantsTree: (name: string) => `PyTree: ${name} Descendants`,
             projectTree: 'PyTree: Project Tree',
             pickedClassesTree: 'PyTree: Picked Classes',
             pickedPathsTree: 'PyTree: Picked Paths',

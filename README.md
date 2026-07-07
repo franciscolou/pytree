@@ -19,7 +19,7 @@ No additional configuration is needed. The extension activates automatically whe
 
 Open a tree focused on the class under your cursor, showing all ancestor layers above it.
 
-**Trigger:** `Ctrl + Alt + Space` · Command Palette: `PyTree: Class Tree` · Hover link
+**Trigger:** `Ctrl + Alt + Space` · Command Palette: `PyTree: Ancestors Tree` · Hover link
 
 ![Demo for Simple Tree](https://raw.githubusercontent.com/franciscolou/pytree/main/assets/gifs/simple.gif)
 
@@ -129,7 +129,7 @@ A checkbox in the webview header toggles file-path labels on every class box. By
 
 ### Hover Integration
 
-Hovering over any class name in a Python file shows a small card with two clickable links — **Show Class Tree** and **Show Complete Tree** — that open the corresponding view for that class without moving your cursor to the Command Palette.
+Hovering over any class name in a Python file shows a small card with clickable links — **Show Ancestors Tree** and **Show Complete Tree** — that open the corresponding view for that class without moving your cursor to the Command Palette.
 
 <!-- VIDEO PLACEHOLDER: hover demo -->
 
@@ -175,7 +175,7 @@ Pan position, zoom level, and the file-paths checkbox state are persisted per we
 
 | Command                        | Title                       | Shortcut         |
 | ------------------------------ | --------------------------- | ---------------- |
-| `pytree.showClassTree`         | PyTree: Class Tree          | `Ctrl+Alt+Space` |
+| `pytree.showAncestorsTree`     | PyTree: Ancestors Tree      | `Ctrl+Alt+Space` |
 | `pytree.showCompleteClassTree` | PyTree: Complete Class Tree | `Ctrl+Alt+T`     |
 | `pytree.showProjectTree`       | PyTree: Project Tree        | `Ctrl+Alt+P`     |
 | `pytree.pickClasses`           | PyTree: Pick Classes...     | —                |

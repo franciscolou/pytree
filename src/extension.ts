@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { ClassRef } from './types';
 import {
-    showClassTree,
+    showAncestorsTree,
     showCompleteClassTree,
+    showDescendantsTree,
     showProjectTree,
     showPickClassesTree,
     showPickPathsTree,
@@ -26,8 +27,9 @@ export function activate(context: vscode.ExtensionContext) {
     setWorkspaceUri(workspaceUri);
     initCache(context);
     context.subscriptions.push(
-        registerShowClassCommand(context),
+        registerShowAncestorsCommand(context),
         registerShowCompleteClassCommand(context),
+        registerShowDescendantsCommand(context),
         registerShowProjectTreeCommand(context),
         registerPickClassesCommand(context),
         registerPickPathsCommand(context),
@@ -133,12 +135,12 @@ function registerHoverProvider(): vscode.Disposable {
     return vscode.languages.registerHoverProvider('python', HoverProvider);
 }
 
-function registerShowClassCommand(
+function registerShowAncestorsCommand(
     context: vscode.ExtensionContext
 ): vscode.Disposable {
     return vscode.commands.registerCommand(
-        'pytree.showClassTree',
-        (ref?: ClassRef) => showClassTree(context, ref)
+        'pytree.showAncestorsTree',
+        (ref?: ClassRef) => showAncestorsTree(context, ref)
     );
 }
 
@@ -148,6 +150,15 @@ function registerShowCompleteClassCommand(
     return vscode.commands.registerCommand(
         'pytree.showCompleteClassTree',
         (ref?: ClassRef) => showCompleteClassTree(context, ref)
+    );
+}
+
+function registerShowDescendantsCommand(
+    context: vscode.ExtensionContext
+): vscode.Disposable {
+    return vscode.commands.registerCommand(
+        'pytree.showDescendantsTree',
+        (ref?: ClassRef) => showDescendantsTree(context, ref)
     );
 }
 

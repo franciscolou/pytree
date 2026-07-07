@@ -21,10 +21,10 @@ export function renderClassHover(node: ClassNode): string {
         `$(${icons.brand}) **${brand}**`,
         '',
         option(
-            icons.showClassTree,
-            labels.showClassTree,
-            descriptions.showClassTree,
-            'pytree.showClassTree'
+            icons.showAncestorsTree,
+            labels.showAncestorsTree,
+            descriptions.showAncestorsTree,
+            'pytree.showAncestorsTree'
         ),
         '',
         option(
@@ -32,6 +32,13 @@ export function renderClassHover(node: ClassNode): string {
             labels.showCompleteTree,
             descriptions.showCompleteTree,
             'pytree.showCompleteClassTree'
+        ),
+        '',
+        option(
+            icons.showDescendantsTree,
+            labels.showDescendantsTree,
+            descriptions.showDescendantsTree,
+            'pytree.showDescendantsTree'
         ),
     ].join('\n');
 }
