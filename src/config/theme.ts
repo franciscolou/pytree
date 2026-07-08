@@ -51,6 +51,7 @@ export const Theme = {
             small: 13,
             normal: 14,
             header: 15,
+            collapsedHeader: 24,
         },
         weight: {
             normal: 'normal',

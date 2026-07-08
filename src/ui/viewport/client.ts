@@ -12,6 +12,7 @@
 // arrive that way instead of being interpolated into the source.
 
 import type { ViewportConfig } from './types';
+import { Theme } from '../../config';
 
 // --- Ambient declarations for the VSCode webview API ----------------------
 interface VsCodeApi {
@@ -26,6 +27,18 @@ interface PersistedState {
     ty: number;
     scale: number;
     showPaths?: boolean;
+    // Box ids currently collapsed (header-only, all views).
+    collapsed?: string[];
+    // "Unlock class dragging" checkbox state (Project Tree only).
+    dragUnlocked?: boolean;
+    // Per-component drag offsets, keyed by `data-pt-component-id`.
+    offsets?: Array<[string, [number, number]]>;
+    // "Show collapse tools" checkbox state — defaults to true (visible).
+    showCollapseTools?: boolean;
+    // Box ids whose descendants/ancestors are currently hidden via that
+    // box's own hide-descendants/hide-ancestors button.
+    descHiddenTriggers?: string[];
+    ancHiddenTriggers?: string[];
 }
 
 const CLICK_THRESHOLD = 4;
@@ -33,6 +46,11 @@ const LARGE_TREE_THRESHOLD = 50;
 const HYDRATE_MARGIN_PX = 400;
 const DEHYDRATE_MARGIN_PX = 1600;
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// A collapsed title counter-scales as the view zooms out so it never drops
+// below the normal (expanded) header's font size on screen, capped so it
+// can't balloon at extreme zoom-out.
+const MIN_APPARENT_HEADER_PX = Theme.font.size.header;
+const MAX_COLLAPSE_COUNTER_SCALE = 4;
 
 // --- Config + DOM bootstrap -----------------------------------------------
 const configEl = document.getElementById('pt-viewport-config');
@@ -48,6 +66,13 @@ const vscode = acquireVsCodeApi();
 const showPathsCb = document.getElementById(
     'show-paths-cb'
 ) as HTMLInputElement;
+const showCollapseToolsCb = document.getElementById(
+    'show-collapse-tools-cb'
+) as HTMLInputElement;
+// Only present when the renderer passed `dragEnabled: true` (Project Tree).
+const dragCb = document.getElementById(
+    'unlock-drag-cb'
+) as HTMLInputElement | null;
 const edgeTooltip = document.getElementById('edge-tooltip') as HTMLDivElement;
 const navTooltip = document.getElementById('nav-tooltip') as HTMLDivElement;
 
@@ -62,6 +87,12 @@ const findWordBtn = document.getElementById('find-word') as HTMLButtonElement;
 
 const exportBtnEl = document.getElementById('export-btn') as HTMLButtonElement;
 const exportMenuEl = document.getElementById('export-menu') as HTMLDivElement;
+const optionsBtnEl = document.getElementById(
+    'options-btn'
+) as HTMLButtonElement;
+const optionsMenuEl = document.getElementById(
+    'options-menu'
+) as HTMLDivElement;
 
 const isLargeTree =
     viewport.querySelectorAll('[data-pt-box]').length >= LARGE_TREE_THRESHOLD;
@@ -72,10 +103,347 @@ let tx = currentState ? currentState.tx : 0;
 let ty = currentState ? currentState.ty : 0;
 let scale = currentState ? currentState.scale : config.initialScale;
 let showPaths = currentState ? currentState.showPaths ?? false : false;
+let showCollapseTools = currentState?.showCollapseTools ?? true;
+const collapsedIds = new Set<string>(currentState?.collapsed ?? []);
+let dragUnlocked = currentState?.dragUnlocked ?? false;
+const componentOffsets = new Map<string, [number, number]>(
+    currentState?.offsets ?? []
+);
+const descHiddenTriggers = new Set<string>(
+    currentState?.descHiddenTriggers ?? []
+);
+const ancHiddenTriggers = new Set<string>(
+    currentState?.ancHiddenTriggers ?? []
+);
+
+function persistState(): void {
+    vscode.setState({
+        tx,
+        ty,
+        scale,
+        showPaths,
+        collapsed: Array.from(collapsedIds),
+        dragUnlocked,
+        offsets: Array.from(componentOffsets),
+        showCollapseTools,
+        descHiddenTriggers: Array.from(descHiddenTriggers),
+        ancHiddenTriggers: Array.from(ancHiddenTriggers),
+    });
+}
 
 showPathsCb.checked = showPaths;
 if (showPaths) {
     svg.classList.add('show-paths');
+}
+
+showCollapseToolsCb.checked = showCollapseTools;
+if (!showCollapseTools) {
+    svg.classList.add('hide-collapse-tools');
+}
+showCollapseToolsCb.addEventListener('change', () => {
+    showCollapseTools = showCollapseToolsCb.checked;
+    svg.classList.toggle('hide-collapse-tools', !showCollapseTools);
+    persistState();
+});
+
+if (dragCb) {
+    dragCb.checked = dragUnlocked;
+}
+if (dragUnlocked) {
+    svg.classList.add('drag-unlocked');
+}
+if (dragCb) {
+    dragCb.addEventListener('change', () => {
+        dragUnlocked = dragCb.checked;
+        svg.classList.toggle('drag-unlocked', dragUnlocked);
+        persistState();
+    });
+}
+
+// --- Restore collapsed boxes + dragged component positions -----------------
+function escapeCss(id: string): string {
+    return window.CSS && CSS.escape ? CSS.escape(id) : id;
+}
+
+// A collapsed box's own footprint shrinks to just its (enlarged) title —
+// nothing is left behind, so its outgoing edges (where it's the parent) need
+// their attach point re-anchored to the new, higher bottom. Mirrors the
+// constants in src/ui/render/edges.ts; only the parent-side arrow + first
+// segment ever move (see the comment on interactiveEdge for why the rest of
+// each edge's route is untouched).
+const EDGE_ARROW_W = 12;
+const EDGE_ARROW_H = 10;
+const EDGE_TIP_PAD = 6;
+
+function updateEdgeParentAttach(edgeEl: Element, collapsed: boolean): void {
+    const x = parseFloat(edgeEl.getAttribute('data-pt-parent-x') ?? '0');
+    const yExpanded = parseFloat(
+        edgeEl.getAttribute('data-pt-parent-bottom-expanded') ?? '0'
+    );
+    const yCollapsed = parseFloat(
+        edgeEl.getAttribute('data-pt-parent-bottom-collapsed') ?? '0'
+    );
+    const y = collapsed ? yCollapsed : yExpanded;
+
+    const arrow = edgeEl.querySelector('.pt-edge-arrow');
+    if (arrow) {
+        arrow.setAttribute(
+            'points',
+            x +
+                ',' +
+                y +
+                ' ' +
+                (x - EDGE_ARROW_W / 2) +
+                ',' +
+                (y + EDGE_ARROW_H) +
+                ' ' +
+                (x + EDGE_ARROW_W / 2) +
+                ',' +
+                (y + EDGE_ARROW_H)
+        );
+    }
+    const tipHit = edgeEl.querySelector('.pt-edge-tip-hit');
+    if (tipHit) {
+        tipHit.setAttribute(
+            'points',
+            x +
+                ',' +
+                (y - EDGE_TIP_PAD) +
+                ' ' +
+                (x - EDGE_ARROW_W / 2 - EDGE_TIP_PAD) +
+                ',' +
+                (y + EDGE_ARROW_H + EDGE_TIP_PAD) +
+                ' ' +
+                (x + EDGE_ARROW_W / 2 + EDGE_TIP_PAD) +
+                ',' +
+                (y + EDGE_ARROW_H + EDGE_TIP_PAD)
+        );
+    }
+    const newY1 = String(y + EDGE_ARROW_H);
+    edgeEl
+        .querySelector('.pt-edge-hit.pt-edge-seg0')
+        ?.setAttribute('y1', newY1);
+    edgeEl
+        .querySelector('.pt-edge-body-vis.pt-edge-seg0')
+        ?.setAttribute('y1', newY1);
+}
+
+function updateOutgoingEdges(boxId: string, collapsed: boolean): void {
+    viewport
+        .querySelectorAll(
+            '[data-pt-edge][data-pt-edge-parent="' + escapeCss(boxId) + '"]'
+        )
+        .forEach(edgeEl => updateEdgeParentAttach(edgeEl, collapsed));
+}
+
+for (const id of collapsedIds) {
+    const boxEl = viewport.querySelector(
+        '[data-pt-box-id="' + escapeCss(id) + '"]'
+    );
+    boxEl?.setAttribute('data-pt-collapsed', '1');
+    updateOutgoingEdges(id, true);
+}
+
+componentOffsets.forEach(([dx, dy], componentId) => {
+    const compEl = viewport.querySelector(
+        '[data-pt-component-id="' + escapeCss(componentId) + '"]'
+    );
+    compEl?.setAttribute('transform', 'translate(' + dx + ',' + dy + ')');
+});
+
+// Horizontal/vertical fractions of the collapsed panel the scaled title is
+// allowed to fill — leaves a margin so it never touches the panel edges
+// (and, since the title scales from its own centre, never grows tall enough
+// to poke above the panel top into the file-path hover element that floats
+// just above the box).
+const COLLAPSE_FIT_W = 0.86;
+const COLLAPSE_FIT_H = 0.7;
+
+function updateCollapsedScale(boxEl: Element): void {
+    const titleEl = boxEl.querySelector<SVGGElement>('.pt-collapsed-title');
+    const panelRect = boxEl.querySelector<SVGRectElement>(
+        '.pt-panel-collapsed rect'
+    );
+    if (!titleEl || !panelRect) {
+        return;
+    }
+    const bbox = titleEl.getBBox();
+    if (bbox.width === 0 || bbox.height === 0) {
+        return;
+    }
+    const panelW = parseFloat(panelRect.getAttribute('width') ?? '0');
+    const panelH = parseFloat(panelRect.getAttribute('height') ?? '0');
+
+    const legibilityK = Math.max(
+        1,
+        MIN_APPARENT_HEADER_PX / (Theme.font.size.collapsedHeader * scale)
+    );
+    const fitK = Math.min(
+        (panelW * COLLAPSE_FIT_W) / bbox.width,
+        (panelH * COLLAPSE_FIT_H) / bbox.height
+    );
+    const k = Math.min(legibilityK, fitK, MAX_COLLAPSE_COUNTER_SCALE);
+    titleEl.style.transform = k > 1 ? 'scale(' + k + ')' : '';
+}
+
+function updateAllCollapsedScales(): void {
+    collapsedIds.forEach(id => {
+        const boxEl = viewport.querySelector(
+            '[data-pt-box-id="' + escapeCss(id) + '"]'
+        );
+        if (boxEl) {
+            updateCollapsedScale(boxEl);
+        }
+    });
+}
+
+function toggleCollapse(boxEl: Element): void {
+    const id = (boxEl as HTMLElement).dataset.ptBoxId;
+    if (!id) {
+        return;
+    }
+    const collapsing = !boxEl.hasAttribute('data-pt-collapsed');
+    if (collapsing) {
+        boxEl.setAttribute('data-pt-collapsed', '1');
+        collapsedIds.add(id);
+        updateCollapsedScale(boxEl);
+    } else {
+        boxEl.removeAttribute('data-pt-collapsed');
+        collapsedIds.delete(id);
+    }
+    updateOutgoingEdges(id, collapsing);
+    persistState();
+}
+
+// === HIDE DESCENDANTS / ANCESTORS ==========================================
+// Adjacency is derived once from the (static) edge elements already in the
+// DOM — collapse/hide/drag never add or remove edges, only toggle their
+// visibility, so this never goes stale.
+const childrenOf = new Map<string, string[]>();
+const parentsOf = new Map<string, string[]>();
+viewport.querySelectorAll<HTMLElement>('[data-pt-edge]').forEach(edgeEl => {
+    const p = edgeEl.dataset.ptEdgeParent;
+    const c = edgeEl.dataset.ptEdgeChild;
+    if (!p || !c) {
+        return;
+    }
+    if (!childrenOf.has(p)) {
+        childrenOf.set(p, []);
+    }
+    childrenOf.get(p)!.push(c);
+    if (!parentsOf.has(c)) {
+        parentsOf.set(c, []);
+    }
+    parentsOf.get(c)!.push(p);
+});
+
+function collectReachable(
+    startId: string,
+    adjacency: Map<string, string[]>
+): Set<string> {
+    const result = new Set<string>();
+    const stack = [...(adjacency.get(startId) ?? [])];
+    while (stack.length) {
+        const cur = stack.pop()!;
+        if (result.has(cur)) {
+            continue;
+        }
+        result.add(cur);
+        stack.push(...(adjacency.get(cur) ?? []));
+    }
+    return result;
+}
+
+// Ids currently hidden by *any* trigger. An edge is hidden whenever either
+// endpoint is in this set, so a hidden box never leaves a dangling arrow
+// behind (e.g. an ancestor's *other* children that aren't themselves
+// ancestors of the triggering box).
+const hiddenNodeIds = new Set<string>();
+
+function refreshEdgesTouching(ids: Set<string>): void {
+    viewport.querySelectorAll<HTMLElement>('[data-pt-edge]').forEach(edgeEl => {
+        const p = edgeEl.dataset.ptEdgeParent;
+        const c = edgeEl.dataset.ptEdgeChild;
+        if ((p && ids.has(p)) || (c && ids.has(c))) {
+            const hidden =
+                (!!p && hiddenNodeIds.has(p)) || (!!c && hiddenNodeIds.has(c));
+            edgeEl.style.display = hidden ? 'none' : '';
+        }
+    });
+}
+
+function hideNodes(ids: Set<string>): void {
+    ids.forEach(id => {
+        hiddenNodeIds.add(id);
+        const boxEl = viewport.querySelector(
+            '[data-pt-box-id="' + escapeCss(id) + '"]'
+        );
+        boxEl?.setAttribute('data-pt-hidden', '1');
+    });
+    refreshEdgesTouching(ids);
+}
+
+function showNodes(ids: Set<string>): void {
+    ids.forEach(id => {
+        hiddenNodeIds.delete(id);
+        const boxEl = viewport.querySelector(
+            '[data-pt-box-id="' + escapeCss(id) + '"]'
+        );
+        boxEl?.removeAttribute('data-pt-hidden');
+    });
+    refreshEdgesTouching(ids);
+}
+
+// Both directions share this shape: recompute the (static) subtree fresh
+// each time rather than remembering exactly what a given click hid, so
+// overlapping hide operations from different boxes stay simple — the trade
+// off is that "show" always reveals a trigger's *whole* subtree even if
+// another still-active trigger would also claim part of it.
+function toggleTreeVisibility(
+    boxEl: Element,
+    kind: 'descendants' | 'ancestors'
+): void {
+    const id = (boxEl as HTMLElement).dataset.ptBoxId;
+    if (!id) {
+        return;
+    }
+    const adjacency = kind === 'descendants' ? childrenOf : parentsOf;
+    const attr =
+        kind === 'descendants'
+            ? 'data-pt-descendants-hidden'
+            : 'data-pt-ancestors-hidden';
+    const triggers = kind === 'descendants' ? descHiddenTriggers : ancHiddenTriggers;
+    const targets = collectReachable(id, adjacency);
+    const hiding = !boxEl.hasAttribute(attr);
+    if (hiding) {
+        boxEl.setAttribute(attr, '1');
+        triggers.add(id);
+        hideNodes(targets);
+    } else {
+        boxEl.removeAttribute(attr);
+        triggers.delete(id);
+        showNodes(targets);
+    }
+    persistState();
+}
+
+for (const id of descHiddenTriggers) {
+    const boxEl = viewport.querySelector(
+        '[data-pt-box-id="' + escapeCss(id) + '"]'
+    );
+    if (boxEl) {
+        boxEl.setAttribute('data-pt-descendants-hidden', '1');
+        hideNodes(collectReachable(id, childrenOf));
+    }
+}
+for (const id of ancHiddenTriggers) {
+    const boxEl = viewport.querySelector(
+        '[data-pt-box-id="' + escapeCss(id) + '"]'
+    );
+    if (boxEl) {
+        boxEl.setAttribute('data-pt-ancestors-hidden', '1');
+        hideNodes(collectReachable(id, parentsOf));
+    }
 }
 
 // === LAZY BODY HYDRATION ==================================================
@@ -216,6 +584,16 @@ exportBtnEl.addEventListener('click', e => {
 exportMenuEl.addEventListener('click', e => e.stopPropagation());
 document.addEventListener('click', () => exportMenuEl.classList.remove('open'));
 
+// === OPTIONS DROPDOWN (Show all file paths, Unlock class dragging, ...) ===
+optionsBtnEl.addEventListener('click', e => {
+    e.stopPropagation();
+    optionsMenuEl.classList.toggle('open');
+});
+optionsMenuEl.addEventListener('click', e => e.stopPropagation());
+document.addEventListener('click', () =>
+    optionsMenuEl.classList.remove('open')
+);
+
 function buildExportClone(): {
     clone: SVGSVGElement;
     vbW: number;
@@ -310,7 +688,7 @@ document.getElementById('export-as-svg')!.addEventListener('click', () => {
 showPathsCb.addEventListener('change', () => {
     showPaths = showPathsCb.checked;
     svg.classList.toggle('show-paths', showPaths);
-    vscode.setState({ tx, ty, scale, showPaths });
+    persistState();
 });
 
 // === SNAPSHOT ZOOM (large trees only) =====================================
@@ -366,7 +744,8 @@ function update(): void {
     _committedTx = tx;
     _committedTy = ty;
     _committedScale = scale;
-    vscode.setState({ tx, ty, scale, showPaths });
+    updateAllCollapsedScales();
+    persistState();
     scheduleHydrate();
 }
 
@@ -667,6 +1046,118 @@ function endEdgeBodyClick(e: PointerEvent): boolean {
     return true;
 }
 
+// === COMPONENT DRAG (Project Tree, "Unlock class dragging" only) ==========
+// A connected component never shares an edge with another component, so
+// dragging just translates the whole `[data-pt-component-id]` group — every
+// box and edge inside it moves together and nothing outside it is touched.
+interface ComponentDragState {
+    groupEl: SVGGElement;
+    componentId: string;
+    baseDx: number;
+    baseDy: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+    // svg.setPointerCapture() retargets e.target to `svg` itself on every
+    // subsequent event for this pointer, so the originally clicked element
+    // has to be captured up front — reading e.target in endComponentDrag
+    // would always miss the [data-line] ancestor. Same pitfall the generic
+    // pan path avoids via `pointerDownTarget`.
+    downTarget: Element | null;
+}
+
+let componentDrag: ComponentDragState | null = null;
+
+function startComponentDrag(boxEl: Element, e: PointerEvent): void {
+    const groupEl = boxEl.closest<SVGGElement>('[data-pt-component-id]');
+    if (!groupEl) {
+        return;
+    }
+    const componentId = groupEl.dataset.ptComponentId ?? '';
+    const [baseDx, baseDy] = componentOffsets.get(componentId) ?? [0, 0];
+    componentDrag = {
+        groupEl,
+        componentId,
+        baseDx,
+        baseDy,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+        downTarget: e.target as Element | null,
+    };
+    svg.setPointerCapture(e.pointerId);
+    svg.style.cursor = 'grabbing';
+}
+
+function updateComponentDrag(e: PointerEvent): void {
+    if (!componentDrag) {
+        return;
+    }
+    const dx = e.clientX - componentDrag.startX;
+    const dy = e.clientY - componentDrag.startY;
+    if (
+        !componentDrag.moved &&
+        Math.abs(dx) < CLICK_THRESHOLD &&
+        Math.abs(dy) < CLICK_THRESHOLD
+    ) {
+        return;
+    }
+    componentDrag.moved = true;
+    const newDx = componentDrag.baseDx + dx / scale;
+    const newDy = componentDrag.baseDy + dy / scale;
+    componentDrag.groupEl.setAttribute(
+        'transform',
+        'translate(' + newDx + ',' + newDy + ')'
+    );
+}
+
+// Returns true when it fully handled the pointerup (drag commit or the
+// click-to-navigate fallback for a non-moved click), mirroring
+// endEdgeDrag/endEdgeBodyClick so endPan's generic pan-end logic is skipped.
+function endComponentDrag(e: PointerEvent): boolean {
+    if (!componentDrag) {
+        return false;
+    }
+    const {
+        groupEl,
+        componentId,
+        baseDx,
+        baseDy,
+        startX,
+        startY,
+        moved,
+        downTarget,
+    } = componentDrag;
+    componentDrag = null;
+    svg.style.cursor = 'grab';
+    try {
+        svg.releasePointerCapture(e.pointerId);
+    } catch {
+        // already released
+    }
+
+    if (!moved) {
+        const navTarget = downTarget?.closest<HTMLElement>('[data-line]');
+        if (navTarget) {
+            vscode.postMessage({
+                command: 'navigate',
+                fileUri: navTarget.dataset.file,
+                line: parseInt(navTarget.dataset.line ?? '0', 10),
+            });
+        }
+        return true;
+    }
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const newDx = baseDx + dx / scale;
+    const newDy = baseDy + dy / scale;
+    groupEl.setAttribute('transform', 'translate(' + newDx + ',' + newDy + ')');
+    componentOffsets.set(componentId, [newDx, newDy]);
+    persistState();
+    return true;
+}
+
 // === PAN / ZOOM ===========================================================
 let isPanning = false;
 let pointerDownTarget: Element | null = null;
@@ -699,6 +1190,37 @@ svg.addEventListener('pointerdown', e => {
         return;
     }
     const target = e.target as Element | null;
+
+    const collapseBtn = target?.closest('[data-pt-collapse-toggle]');
+    if (collapseBtn) {
+        e.stopPropagation();
+        const boxEl = collapseBtn.closest('[data-pt-box]');
+        if (boxEl) {
+            toggleCollapse(boxEl);
+        }
+        return;
+    }
+
+    const hideDescendantsBtn = target?.closest('[data-pt-hide-descendants]');
+    if (hideDescendantsBtn) {
+        e.stopPropagation();
+        const boxEl = hideDescendantsBtn.closest('[data-pt-box]');
+        if (boxEl) {
+            toggleTreeVisibility(boxEl, 'descendants');
+        }
+        return;
+    }
+
+    const hideAncestorsBtn = target?.closest('[data-pt-hide-ancestors]');
+    if (hideAncestorsBtn) {
+        e.stopPropagation();
+        const boxEl = hideAncestorsBtn.closest('[data-pt-box]');
+        if (boxEl) {
+            toggleTreeVisibility(boxEl, 'ancestors');
+        }
+        return;
+    }
+
     const edgeEl = target?.closest('[data-pt-edge]') as SVGGElement | null;
     if (edgeEl) {
         e.stopPropagation();
@@ -711,6 +1233,16 @@ svg.addEventListener('pointerdown', e => {
         }
         return;
     }
+
+    if (config.dragEnabled && dragUnlocked) {
+        const boxEl = target?.closest('[data-pt-box]');
+        if (boxEl) {
+            e.stopPropagation();
+            startComponentDrag(boxEl, e);
+            return;
+        }
+    }
+
     isPanning = true;
     panButton = 0;
     pointerDownTarget = target;
@@ -728,6 +1260,10 @@ svg.addEventListener('pointermove', e => {
     }
     if (edgeBodyClick) {
         updateEdgeBodyClick(e);
+        return;
+    }
+    if (componentDrag) {
+        updateComponentDrag(e);
         return;
     }
     if (!isPanning) {
@@ -750,6 +1286,9 @@ function endPan(e: PointerEvent): void {
         return;
     }
     if (endEdgeBodyClick(e)) {
+        return;
+    }
+    if (endComponentDrag(e)) {
         return;
     }
     // Only the left button triggers click-to-navigate. A middle-click without

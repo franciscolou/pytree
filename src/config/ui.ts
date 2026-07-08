@@ -3,6 +3,7 @@ export const UI = {
         minWidth: 260,
         maxWidth: 720,
         headerHeight: 32,
+        collapsedHeaderHeight: 56,
         padding: 14,
         sectionGap: 10,
         lineHeight: 20,

@@ -34,7 +34,10 @@ function renderFilterBadge(info: FilterInfo): string {
 </div>`;
 }
 
-export function WebViewOptions(filterInfo?: FilterInfo): string {
+export function WebViewOptions(
+    filterInfo?: FilterInfo,
+    dragEnabled?: boolean
+): string {
     return `
 <style>
   #export-btn {
@@ -159,6 +162,61 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
     background: var(--pt-accent-soft);
     color: var(--pt-accent);
   }
+  #options-btn {
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  #options-btn:hover {
+    background: var(--pt-glass-hover);
+    border-color: var(--pt-accent);
+  }
+  #options-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--pt-glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--pt-glass-border);
+    border-radius: 10px;
+    box-shadow: var(--pt-shadow-float);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    white-space: nowrap;
+    min-width: 210px;
+    z-index: 10;
+  }
+  #options-menu.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .options-menu-item {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--pt-text);
+    user-select: none;
+    transition: background 0.1s ease;
+  }
+  .options-menu-item:hover {
+    background: var(--pt-accent-soft);
+  }
+  .options-menu-item input {
+    cursor: pointer;
+    accent-color: var(--pt-accent);
+  }
+  .options-menu-item label {
+    cursor: pointer;
+  }
 </style>
 <div
     style="
@@ -220,38 +278,58 @@ export function WebViewOptions(filterInfo?: FilterInfo): string {
         </div>
     </div>
 
-    <div
-        id="paths-toggle"
-        style="
-            background: var(--pt-glass-bg);
-            -webkit-backdrop-filter: blur(16px) saturate(150%);
-            backdrop-filter: blur(16px) saturate(150%);
-            border: 1px solid var(--pt-glass-border);
-            border-radius: 9px;
-            padding: 6px 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: var(--pt-shadow-float);
-        "
-    >
-        <input
-            type="checkbox"
-            id="show-paths-cb"
-            style="outline: none; accent-color: var(--pt-accent);"
-        />
-
-        <label
-            for="show-paths-cb"
+    <div style="position: relative;">
+        <div
+            id="options-btn"
+            title="${Messages.webView.options.optionsMenu}"
             style="
-                color: var(--pt-text);
-                font-size: 12px;
+                border: 1px solid var(--pt-glass-border);
+                border-radius: 9px;
+                padding: 6px 9px;
+                display: flex;
+                align-items: center;
+                box-shadow: var(--pt-shadow-float);
                 cursor: pointer;
-                user-select: none;
+                color: var(--pt-text);
             "
         >
-            ${Messages.webView.options.showAllFilePaths}
-        </label>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:block;flex-shrink:0;">
+                <path d="M2 4h10M2 7h10M2 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </div>
+
+        <div id="options-menu">
+            <div class="options-menu-item">
+                <input
+                    type="checkbox"
+                    id="show-paths-cb"
+                    style="outline: none;"
+                />
+                <label for="show-paths-cb">${Messages.webView.options.showAllFilePaths}</label>
+            </div>
+            <div class="options-menu-item">
+                <input
+                    type="checkbox"
+                    id="show-collapse-tools-cb"
+                    checked
+                    style="outline: none;"
+                />
+                <label for="show-collapse-tools-cb">${Messages.webView.options.showCollapseTools}</label>
+            </div>
+            ${dragEnabled ? renderDragToggleItem() : ''}
+        </div>
     </div>
 </div>`;
+}
+
+function renderDragToggleItem(): string {
+    return `
+            <div class="options-menu-item">
+                <input
+                    type="checkbox"
+                    id="unlock-drag-cb"
+                    style="outline: none;"
+                />
+                <label for="unlock-drag-cb">${Messages.webView.options.unlockClassDragging}</label>
+            </div>`;
 }

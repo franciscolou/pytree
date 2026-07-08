@@ -11,4 +11,7 @@ export interface ViewportConfig {
     panSensitivity: number;
     /** Per-wheel-tick scale factor (1 + step). */
     zoomStep: number;
+    /** When true, the "Unlock class dragging" checkbox is wired up
+     *  (Project Tree only, for now). */
+    dragEnabled?: boolean;
 }

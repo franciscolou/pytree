@@ -1,5 +1,5 @@
 import type { ClassNode, BoxMeasures } from '../../types';
-import { Theme } from '../../config';
+import { Theme, UI } from '../../config';
 import { Line } from '../components';
 import {
     computeEdgeGeometry,
@@ -12,8 +12,14 @@ const ARROW_H = 10;
 const BODY_HIT_W = 14;
 const BODY_VIS_W = 1;
 
-export function hollowArrow(x: number, y: number, color: string): string {
-    return `<polygon points="${x},${y} ${x - ARROW_W / 2},${y + ARROW_H} ${x + ARROW_W / 2},${y + ARROW_H}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+export function hollowArrow(
+    x: number,
+    y: number,
+    color: string,
+    className?: string
+): string {
+    const cls = className ? ` class="${className}"` : '';
+    return `<polygon${cls} points="${x},${y} ${x - ARROW_W / 2},${y + ARROW_H} ${x + ARROW_W / 2},${y + ARROW_H}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
 }
 
 function escapeAttr(s: string): string {
@@ -32,20 +38,34 @@ function escapeAttr(s: string): string {
 //   - click anywhere on the body → focus the superclass
 // Each visible primitive is shadowed by a wider, transparent twin that owns the
 // hit area, so a thin 1px line still has a comfortable click target.
-function interactiveEdge(e: ComputedEdge, color: string): string {
+//
+// `parentBottomCollapsed` is the Y the parent's bottom edge would be at if it
+// were collapsed (see classBox.ts). Segment 0 (and the arrow/tip) always sit
+// at the parent's attach point by construction — see buildAdjacentSegments /
+// buildHighwaySegments in edgeLayout.ts — so they're the only pieces tagged
+// for the client to re-anchor when that specific parent's collapse state
+// toggles; everything downstream of them (the bus/highway routing) is
+// computed from *other* boxes' positions and is unaffected.
+function interactiveEdge(
+    e: ComputedEdge,
+    color: string,
+    parentBottomCollapsed: number
+): string {
     const { arrow, segments, childId, parentId, childName, parentName } = e;
 
     const tipPad = 6;
-    const tipHit = `<polygon points="${arrow.x},${arrow.y - tipPad} ${arrow.x - ARROW_W / 2 - tipPad},${arrow.y + ARROW_H + tipPad} ${arrow.x + ARROW_W / 2 + tipPad},${arrow.y + ARROW_H + tipPad}" fill="transparent" stroke="none"/>`;
-    const tipVis = hollowArrow(arrow.x, arrow.y, color);
+    const tipHit = `<polygon class="pt-edge-tip-hit" points="${arrow.x},${arrow.y - tipPad} ${arrow.x - ARROW_W / 2 - tipPad},${arrow.y + ARROW_H + tipPad} ${arrow.x + ARROW_W / 2 + tipPad},${arrow.y + ARROW_H + tipPad}" fill="transparent" stroke="none"/>`;
+    const tipVis = hollowArrow(arrow.x, arrow.y, color, 'pt-edge-arrow');
     const tipGroup = `<g data-pt-edge-role="tip" style="cursor: pointer">${tipHit}${tipVis}</g>`;
 
     const bodySegments = segments
-        .map(
-            s =>
-                `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="transparent" stroke-width="${BODY_HIT_W}" pointer-events="stroke"/>` +
-                `<line class="pt-edge-body-vis" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${color}" stroke-width="${BODY_VIS_W}" pointer-events="none"/>`
-        )
+        .map((s, i) => {
+            const segCls = i === 0 ? ' pt-edge-seg0' : '';
+            return (
+                `<line class="pt-edge-hit${segCls}" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="transparent" stroke-width="${BODY_HIT_W}" pointer-events="stroke"/>` +
+                `<line class="pt-edge-body-vis${segCls}" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${color}" stroke-width="${BODY_VIS_W}" pointer-events="none"/>`
+            );
+        })
         .join('');
     const bodyGroup = `<g data-pt-edge-role="body" style="cursor: pointer">${bodySegments}</g>`;
 
@@ -53,13 +73,18 @@ function interactiveEdge(e: ComputedEdge, color: string): string {
         childName && parentName
             ? ` data-pt-edge-child-name="${escapeAttr(childName)}" data-pt-edge-parent-name="${escapeAttr(parentName)}"`
             : '';
-    return `<g data-pt-edge="1" data-pt-edge-child="${escapeAttr(childId)}" data-pt-edge-parent="${escapeAttr(parentId)}"${nameAttrs}>${tipGroup}${bodyGroup}</g>`;
+    return (
+        `<g data-pt-edge="1" data-pt-edge-child="${escapeAttr(childId)}" data-pt-edge-parent="${escapeAttr(parentId)}"` +
+        ` data-pt-parent-x="${arrow.x}" data-pt-parent-bottom-expanded="${arrow.y}" data-pt-parent-bottom-collapsed="${parentBottomCollapsed}"` +
+        `${nameAttrs}>${tipGroup}${bodyGroup}</g>`
+    );
 }
 
 function renderComputedEdge(
     e: ComputedEdge,
     palette: readonly string[],
-    interactive: boolean
+    interactive: boolean,
+    parentBottomCollapsed: number
 ): string {
     const color = palette[e.colorIndex % palette.length];
     if (!interactive) {
@@ -71,7 +96,7 @@ function renderComputedEdge(
             .join('');
         return arrow + lines;
     }
-    return interactiveEdge(e, color);
+    return interactiveEdge(e, color, parentBottomCollapsed);
 }
 
 /* =========================================================
@@ -90,6 +115,11 @@ export function renderLayeredEdges(
     }
 
     const connections: RawConnection[] = [];
+    // Parallel to `connections`: the Y each connection's parent bottom would
+    // be at if that parent were collapsed. Kept alongside rather than on
+    // RawConnection itself since computeEdgeGeometry doesn't need it — it's
+    // purely client-side metadata for patching the edge after the fact.
+    const parentBottomsCollapsed: number[] = [];
     for (let i = 0; i < layers.length; i++) {
         for (let j = i + 1; j < layers.length; j++) {
             layers[i].forEach((parent, pi) => {
@@ -111,6 +141,10 @@ export function renderLayeredEdges(
                         parentName: parent.name,
                         childName: child.name,
                     });
+                    parentBottomsCollapsed.push(
+                        pBox.y +
+                            Math.min(UI.box.collapsedHeaderHeight, pBox.height)
+                    );
                 });
             });
         }
@@ -126,7 +160,14 @@ export function renderLayeredEdges(
     };
     const computed = computeEdgeGeometry(connections, bounds);
     return computed
-        .map(e => renderComputedEdge(e, Theme.colors.edgePalette, true))
+        .map((e, i) =>
+            renderComputedEdge(
+                e,
+                Theme.colors.edgePalette,
+                true,
+                parentBottomsCollapsed[i]
+            )
+        )
         .join('');
 }
 

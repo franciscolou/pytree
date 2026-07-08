@@ -61,6 +61,57 @@ export function renderBaseStyles(): string {
     #svgRoot.zooming text {
         visibility: hidden;
     }
+
+    /* Collapse: the two panel variants (full box vs. small collapsed panel)
+       toggle on data-pt-collapsed, set by a data-pt-collapse-toggle click.
+       .pt-collapsed-title gets a counter-scale transform from the client so
+       its text stays legible when zoomed out. */
+    [data-pt-box][data-pt-collapsed] .pt-panel-expanded {
+        display: none;
+    }
+    [data-pt-box][data-pt-collapsed] .pt-box-body {
+        display: none;
+    }
+    [data-pt-box]:not([data-pt-collapsed]) .pt-panel-collapsed {
+        display: none;
+    }
+    [data-pt-collapse-toggle],
+    [data-pt-hide-descendants],
+    [data-pt-hide-ancestors] {
+        cursor: pointer !important;
+        opacity: 0.75;
+    }
+    [data-pt-collapse-toggle]:hover,
+    [data-pt-hide-descendants]:hover,
+    [data-pt-hide-ancestors]:hover {
+        opacity: 1;
+    }
+    .pt-collapsed-title {
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+
+    /* Hide descendants/ancestors: the target boxes get data-pt-hidden; the
+       triggering box gets data-pt-descendants-hidden / -ancestors-hidden so
+       its own button can highlight while active. */
+    [data-pt-box][data-pt-hidden] {
+        display: none;
+    }
+    [data-pt-box][data-pt-descendants-hidden] [data-pt-hide-descendants] circle {
+        fill: var(--pt-accent);
+    }
+    [data-pt-box][data-pt-ancestors-hidden] [data-pt-hide-ancestors] circle {
+        fill: var(--pt-accent);
+    }
+
+    /* "Show collapse tools" checkbox: hides the collapse/hide-subtree
+       buttons on every box (they stay functionally inert since they're not
+       clickable while hidden). */
+    #svgRoot.hide-collapse-tools [data-pt-collapse-toggle],
+    #svgRoot.hide-collapse-tools [data-pt-hide-descendants],
+    #svgRoot.hide-collapse-tools [data-pt-hide-ancestors] {
+        display: none;
+    }
 </style>`;
 }
 
@@ -83,8 +134,9 @@ function renderClientStyles(): string {
   #find-close { border: none !important; color: #888 !important; padding: 2px 5px !important; }
   #find-close:hover { color: var(--pt-text) !important; background: transparent !important; }
   #find-input:focus { outline: none; border-color: var(--pt-accent) !important; box-shadow: 0 0 0 3px var(--pt-focus-ring); }
-  #paths-toggle label { cursor: pointer; user-select: none; }
-  #paths-toggle input { cursor: pointer; accent-color: var(--pt-accent); }
+  #svgRoot.drag-unlocked [data-pt-component-id] [data-pt-box] {
+    cursor: grab;
+  }
   .find-toggle.active { background: var(--pt-accent-soft) !important; border-color: var(--pt-accent) !important; color: var(--pt-accent) !important; }
   [data-pt-edge-role="tip"]:hover polygon[fill="none"] {
     transform-box: fill-box;
@@ -144,6 +196,9 @@ export function renderViewportScript(
         // into its <g data-pt-lazy-body> slot when the box (or a generous
         // margin around it) intersects the visible viewport.
         lazyBodies?: Array<[string, string]>;
+        // Project Tree only, for now: wires up the "Unlock class dragging"
+        // checkbox + drag interactions for whole connected-component trees.
+        dragEnabled?: boolean;
     } = {}
 ): string {
     const config: ViewportConfig = {
@@ -151,6 +206,7 @@ export function renderViewportScript(
         focusNodeId: opts.focusNodeId,
         panSensitivity: UI.pan.sensitivity,
         zoomStep: UI.zoom.step,
+        dragEnabled: opts.dragEnabled,
     };
 
     const configTag = `<script type="application/json" id="pt-viewport-config">${escapeScriptJson(
@@ -168,7 +224,7 @@ export function renderViewportScript(
     return `
 ${lazyDataTag}
 ${renderClientStyles()}
-${WebViewOptions(opts.filterInfo)}
+${WebViewOptions(opts.filterInfo, opts.dragEnabled)}
 ${FindBar()}
 <div id="edge-tooltip"></div>
 <div id="nav-tooltip">Go to definition</div>

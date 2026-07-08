@@ -42,7 +42,10 @@ export const Messages = {
             allExceptTree: 'PyTree: All Except',
         },
         options: {
+            optionsMenu: 'Options',
             showAllFilePaths: 'Show all file paths',
+            showCollapseTools: 'Show collapse tools',
+            unlockClassDragging: 'Unlock class dragging',
             export: 'Export',
         },
         create: {

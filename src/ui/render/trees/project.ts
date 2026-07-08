@@ -168,8 +168,7 @@ export function renderProjectTree(
     const lazy = allNodes.size > UI.lazy.renderThreshold;
     const lazyBodies: Array<[string, string]> = [];
 
-    let boxesSvg = '';
-    let edgesSvg = '';
+    const componentGroups: string[] = [];
 
     for (let ci = 0; ci < componentLayers.length; ci++) {
         const rawLayers = componentLayers[ci];
@@ -180,6 +179,7 @@ export function renderProjectTree(
         const layerBoxes: BoxMeasures[][] = [];
         let currentY = rowYs[row];
         let parentPositions = new Map<string, number>();
+        let componentBoxesSvg = '';
 
         for (const rawLayer of rawLayers) {
             const ordered =
@@ -196,7 +196,7 @@ export function renderProjectTree(
                 lazy,
                 lazyBodies
             );
-            boxesSvg += svgs.join('');
+            componentBoxesSvg += svgs.join('');
             layerBoxes.push(positions);
             currentY += Math.max(...positions.map(p => p.height)) + verticalGap;
             parentPositions = new Map(
@@ -204,7 +204,20 @@ export function renderProjectTree(
             );
         }
 
-        edgesSvg += renderLayeredEdges(layers, layerBoxes);
+        const componentEdgesSvg = renderLayeredEdges(layers, layerBoxes);
+
+        // Wrapping each component in its own group lets "Unlock class
+        // dragging" move a whole hierarchy (boxes + its internal edges) as
+        // one rigid unit by translating a single transform — connected
+        // components never share edges, so nothing outside this group needs
+        // to be touched when it's dragged.
+        componentGroups.push(
+            Group({
+                dataPtComponentId: String(ci),
+                transform: 'translate(0,0)',
+                children: componentEdgesSvg + componentBoxesSvg,
+            })
+        );
     }
 
     return HtmlRoot(
@@ -217,13 +230,14 @@ export function renderProjectTree(
                 Group({
                     id: 'viewport',
                     transform: 'translate(0,0) scale(1)',
-                    children: edgesSvg + boxesSvg,
+                    children: componentGroups.join(''),
                 }),
         }) +
             renderViewportScript({
                 initialScale: 0.5,
                 filterInfo,
                 lazyBodies: lazy ? lazyBodies : undefined,
+                dragEnabled: true,
             })
     );
 }

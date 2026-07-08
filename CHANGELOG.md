@@ -6,7 +6,19 @@ All notable changes to the "PyTree" extension will be documented in this file.
 
 - Currently studying possible new features and preventive fixes for potential bugs.
 
-### [0.2.3] - 2026-07-07
+## [0.2.4] - 2026-07-08
+
+### Added
+
+- **Class dragging**: Allows moving trees freely along the webview. This behaviour can be toggled in the UI menu.
+
+- **Collapse classes and trees**: Buttons in the top-left of the class box allows you to hide class members and ancestors/descendants from a specific class. These controls' visibility can be toggled in the UI menu.
+
+### Changed
+
+- Unified UI view configs in a hamburger menu.
+
+## [0.2.3] - 2026-07-07
 
 ### Added
 

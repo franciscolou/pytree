@@ -756,6 +756,52 @@ function renderMethodRows(
     return { svg, endY: y };
 }
 
+function renderCollapseToggle(width: number, glyph: 'minus' | 'plus'): string {
+    const cx = width - 18;
+    const cy = 16;
+    const stroke = Theme.colors.headerText;
+    const hLine = `<line x1="${cx - 4}" y1="${cy}" x2="${cx + 4}" y2="${cy}" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" />`;
+    const vLine = `<line x1="${cx}" y1="${cy - 4}" x2="${cx}" y2="${cy + 4}" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" />`;
+    const glyphSvg = glyph === 'minus' ? hLine : hLine + vLine;
+    // The box's own id is read by the client via .closest('[data-pt-box]')
+    // on the ancestor box group, so the toggle itself doesn't need to carry
+    // (and duplicate) `data-pt-box-id`.
+    return (
+        `<g data-pt-collapse-toggle="1">` +
+        `<circle cx="${cx}" cy="${cy}" r="9" fill="rgba(0,0,0,0.18)" />` +
+        `<g style="pointer-events:none">${glyphSvg}</g>` +
+        `</g>`
+    );
+}
+
+// Sits to the left of the collapse toggle. A chevron pointing toward what the
+// button hides — down toward descendants (below in the tree), up toward
+// ancestors (above) — mirroring the disclosure-triangle idiom used for
+// collapsible trees elsewhere, but as a one-shot action button rather than a
+// nested expand/collapse. `offset` shifts it further from the corner so it
+// doesn't collide with the collapse toggle.
+function renderTreeVisibilityToggle(
+    width: number,
+    offset: number,
+    kind: 'descendants' | 'ancestors'
+): string {
+    const cx = width - 18 - offset;
+    const cy = 16;
+    const stroke = Theme.colors.headerText;
+    const dy = kind === 'descendants' ? 2 : -2;
+    const points = `${cx - 4},${cy - dy} ${cx},${cy + dy} ${cx + 4},${cy - dy}`;
+    const attr =
+        kind === 'descendants'
+            ? 'data-pt-hide-descendants'
+            : 'data-pt-hide-ancestors';
+    return (
+        `<g ${attr}="1">` +
+        `<circle cx="${cx}" cy="${cy}" r="9" fill="rgba(0,0,0,0.18)" />` +
+        `<polyline points="${points}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none" />` +
+        `</g>`
+    );
+}
+
 export function renderClassBox(
     node: ClassNode,
     x: number,
@@ -934,22 +980,25 @@ export function renderClassBox(
     // Header: top corners rounded to match the panel, bottom edge flush so it
     // sits seamlessly above the body. A thin accent rule separates it from the
     // content.
+    //
+    // Collapse renders a second, independent variant of the *whole box* (not
+    // just the header): a small, fully-rounded panel sized to just the
+    // enlarged title, with no body underneath — so the box's own footprint
+    // actually shrinks (nothing left behind to leave a blank rectangle), and
+    // `updateEdgeParentAttach` in the client patches this box's outgoing
+    // edges (where it's the parent) to land on the new, higher bottom edge.
+    // Toggling is a pure visibility swap on `data-pt-collapsed` (see
+    // renderBaseStyles) — since a box is already sized to fit its full body
+    // (`measureClassBox`), the collapsed variant always fits inside that
+    // same height, so no *other* box ever needs to move.
     const r = borderRadius;
     const headerFill = node.isAbstract
         ? Theme.colors.abstractHeaderGradient
         : Theme.colors.headerGradient;
-    const headerPath = `M 0 ${headerHeight} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${
-        width - r
-    } 0 A ${r} ${r} 0 0 1 ${width} ${r} L ${width} ${headerHeight} Z`;
-    const header =
-        `<path d="${headerPath}" fill="${headerFill}" />` +
-        Line({
-            x1: 0,
-            y1: headerHeight - 0.5,
-            x2: width,
-            y2: headerHeight - 0.5,
-            stroke: 'rgba(0,0,0,0.18)',
-        });
+    const roundedHeaderPath = (h: number): string =>
+        `M 0 ${h} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${
+            width - r
+        } 0 A ${r} ${r} 0 0 1 ${width} ${r} L ${width} ${h} Z`;
 
     const title = NavGroup({
         fileUri: node.fileUri,
@@ -966,6 +1015,77 @@ export function renderClassBox(
         }),
     });
 
+    // filePathSection is duplicated into both variants (cheap — just a
+    // handful of text nodes) purely to preserve z-order: its bottom rounded
+    // corners need to sit just behind that variant's own panel, not behind
+    // whichever variant happens to be hidden.
+    const panelExpanded = `<g class="pt-panel-expanded">${
+        panel +
+        filePathSection +
+        `<path d="${roundedHeaderPath(headerHeight)}" fill="${headerFill}" />` +
+        Line({
+            x1: 0,
+            y1: headerHeight - 0.5,
+            x2: width,
+            y2: headerHeight - 0.5,
+            stroke: 'rgba(0,0,0,0.18)',
+        }) +
+        title +
+        renderTreeVisibilityToggle(width, 44, 'ancestors') +
+        renderTreeVisibilityToggle(width, 22, 'descendants') +
+        renderCollapseToggle(width, 'minus')
+    }</g>`;
+
+    const collapsedHeaderHeight = Math.min(
+        UI.box.collapsedHeaderHeight,
+        height
+    );
+    const collapsedPanel = ClassBox({
+        x: 0,
+        y: 0,
+        width,
+        height: collapsedHeaderHeight,
+        borderRadius,
+        fill: headerFill,
+        stroke: Theme.colors.border,
+    });
+    const collapsedTitle = NavGroup({
+        fileUri: node.fileUri,
+        line: node.definedAtLine,
+        role: 'class',
+        children: Group({
+            className: 'pt-collapsed-title',
+            children: Text({
+                x: width / 2,
+                y: collapsedHeaderHeight / 2 + Theme.font.size.collapsedHeader * 0.35,
+                textAnchor: 'middle',
+                fontSize: Theme.font.size.collapsedHeader,
+                fontWeight: Theme.font.weight.bold,
+                fill: Theme.colors.headerText,
+                children: node.name,
+            }),
+        }),
+    });
+    // Visibility is driven entirely by the CSS rules keyed on
+    // data-pt-collapsed (see renderBaseStyles) — no inline style here, so
+    // toggling the attribute client-side is all that's needed in either
+    // direction.
+    // filePathSection dips `borderRadius` px into the box on purpose (see
+    // its own comment above) so its bottom rounded corners get masked by
+    // whatever opaque surface paints over that overlap afterwards — for the
+    // expanded variant that's the header path; here collapsedPanel plays the
+    // same role, so it has to be painted *after* filePathSection, not before
+    // it (otherwise the file-path bar visibly floats in front of the panel
+    // instead of reading as flush-mounted above it).
+    const panelCollapsed = `<g class="pt-panel-collapsed">${
+        filePathSection +
+        collapsedPanel +
+        collapsedTitle +
+        renderTreeVisibilityToggle(width, 44, 'ancestors') +
+        renderTreeVisibilityToggle(width, 22, 'descendants') +
+        renderCollapseToggle(width, 'plus')
+    }</g>`;
+
     const clipId = `clip-${node.id.replace(/\W/g, '_')}`;
     const clipDef = ClipPath({
         id: clipId,
@@ -975,6 +1095,7 @@ export function renderClassBox(
         height: height - headerHeight,
     });
     const clippedContent = Group({
+        className: 'pt-box-body',
         clipPath: `url(#${clipId})`,
         children: parts.join(''),
     });
@@ -984,10 +1105,9 @@ export function renderClassBox(
     // Split point: shell (always emitted) vs. body (lazy-hydratable).
     // Shell carries enough to show the box outline + class name in place so
     // the layout is intelligible while panning across thousands of nodes.
-    // `filePathSection` lives in the shell on purpose — it's hover-only (so
-    // the DOM cost is trivial) and keeping it before `header` preserves the
-    // intended z-order (header masks the section's bottom-rounded corners).
-    const shell = panel + filePathSection + header + title;
+    // Both panel variants live in the shell (not the lazy body) so collapse
+    // works even before a box's body has hydrated.
+    const shell = panelExpanded + panelCollapsed;
     const body = clipDef + clippedContent;
 
     if (opts.lazy) {
